@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
+import { useCity } from '../city';
 import { Logo } from './ui';
-import { Bell, Dashboard, LogOut, Menu, Ticket, X, ChevronDown, Building, Grid } from './icons';
+import { Bell, Dashboard, LogOut, Menu, Ticket, X, ChevronDown, Building, Grid, MapPin, Check } from './icons';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -63,6 +64,7 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-2">
+          <CitySelector />
           {user ? (
             <>
               <button className="relative hidden rounded-full p-2.5 text-ink-500 hover:bg-ink-50 sm:block">
@@ -126,5 +128,36 @@ export default function Navbar() {
 function MenuItem({ to, icon, children, onClick }: { to: string; icon: React.ReactNode; children: React.ReactNode; onClick: () => void }) {
   return (
     <Link to={to} onClick={onClick} className="flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-ink-700 hover:bg-ink-50">{icon} {children}</Link>
+  );
+}
+
+function CitySelector() {
+  const { city, cities, setCity, detect, detecting } = useCity();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 rounded-full border border-ink-200 bg-white py-2 pl-3 pr-2.5 text-sm font-semibold text-ink-800 shadow-sm hover:border-brand-200 hover:bg-brand-50/50">
+        <MapPin width={16} className="text-brand-600" />
+        <span className="hidden max-w-[90px] truncate sm:block">{detecting ? 'Detecting…' : city}</span>
+        <ChevronDown width={15} className="text-ink-400" />
+      </button>
+      {open && (
+        <div className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-soft" onMouseLeave={() => setOpen(false)}>
+          <div className="border-b border-ink-100 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-400">Select your city</div>
+          <div className="max-h-72 overflow-y-auto py-1">
+            {cities.map((c) => (
+              <button key={c} onClick={() => { setCity(c); setOpen(false); }}
+                className={`flex w-full items-center justify-between px-4 py-2.5 text-sm hover:bg-ink-50 ${c === city ? 'font-semibold text-brand-700' : 'text-ink-700'}`}>
+                {c}{c === city && <Check width={16} />}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => { detect(); setOpen(false); }} className="flex w-full items-center gap-2 border-t border-ink-100 px-4 py-3 text-sm font-medium text-brand-700 hover:bg-brand-50">
+            <MapPin width={16} /> Detect my location
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

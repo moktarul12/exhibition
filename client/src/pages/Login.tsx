@@ -5,9 +5,9 @@ import { Logo } from '../components/ui';
 import { Check } from '../components/icons';
 
 const DEMO = [
-  { role: 'Organizer / Admin', hint: 'Floor plans & analytics', email: 'admin@expohub.com', password: 'admin123' },
-  { role: 'Exhibitor / Company', hint: 'Book stalls', email: 'exhibitor@expohub.com', password: 'demo123' },
-  { role: 'Visitor / Guest', hint: 'Discover expos', email: 'visitor@expohub.com', password: 'demo123' },
+  { role: 'Organizer / Admin', hint: 'Floor plans & analytics', email: 'admin@expomela.com', password: 'admin123' },
+  { role: 'Exhibitor / Company', hint: 'Book stalls', email: 'exhibitor@expomela.com', password: 'demo123' },
+  { role: 'Visitor / Guest', hint: 'Discover expos', email: 'visitor@expomela.com', password: 'demo123' },
 ];
 
 export default function Login() {
@@ -40,7 +40,7 @@ export default function Login() {
           <div className="mesh absolute inset-0 opacity-80" />
           <div className="relative"><div className="[&_span]:!text-white"><Logo light /></div></div>
           <div className="relative">
-            <h2 className="font-display text-2xl font-extrabold leading-snug">Welcome back to ExpoHub</h2>
+            <h2 className="font-display text-2xl font-extrabold leading-snug">Welcome back to Expo Mela</h2>
             <p className="mt-2 text-ink-300">Book stalls, manage exhibitions and grow your business — all from one dashboard.</p>
             <ul className="mt-6 space-y-2.5 text-sm">
               {['Live floor-plan stall booking', 'Manage all your bookings', 'Organizer analytics dashboard'].map((t) => (
@@ -48,7 +48,7 @@ export default function Login() {
               ))}
             </ul>
           </div>
-          <div className="relative text-xs text-ink-400">© {new Date().getFullYear()} ExpoHub · Bengaluru</div>
+          <div className="relative text-xs text-ink-400">© {new Date().getFullYear()} Expo Mela · India</div>
         </div>
 
         <div className="p-8 lg:p-10">

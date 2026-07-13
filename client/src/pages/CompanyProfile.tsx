@@ -5,6 +5,7 @@ import type { Company } from '../types';
 import { Spinner } from '../components/ui';
 import { useAuth } from '../auth';
 import { Globe, Mail, Phone, MapPin, Building, Calendar, Check, Download } from '../components/icons';
+import { toEmbedUrl, mediaKind } from '../media';
 
 export default function CompanyProfile() {
   const { id } = useParams();
@@ -76,7 +77,7 @@ export default function CompanyProfile() {
               <div className="text-sm text-slate-500">{c.industry} · {c.city}</div>
             </div>
             <div className="flex flex-wrap gap-2 pb-1">
-              <a href={`mailto:${c.email}?subject=Enquiry via ExpoHub`} className="btn-outline"><Mail width={16} /> Email</a>
+              <a href={`mailto:${c.email}?subject=Enquiry via Expo Mela`} className="btn-outline"><Mail width={16} /> Email</a>
               <a href={`tel:${c.phone}`} className="btn-outline"><Phone width={16} /> Call</a>
             </div>
           </div>
@@ -84,7 +85,7 @@ export default function CompanyProfile() {
         </div>
       </div>
 
-      {(c.youtube_url || c.brochure_url || (c.documents && c.documents.length > 0)) && (
+      {(c.youtube_url || c.reel_url || c.brochure_url || (c.documents && c.documents.length > 0)) && (
         <div className="mt-6 grid gap-5 lg:grid-cols-2">
           {c.youtube_url && (
             <div className="card overflow-hidden p-5">
@@ -92,12 +93,26 @@ export default function CompanyProfile() {
               <div className="aspect-video overflow-hidden rounded-xl bg-slate-900">
                 <iframe
                   title={`${c.name} video`}
-                  src={c.youtube_url}
+                  src={toEmbedUrl(c.youtube_url) || c.youtube_url}
                   className="h-full w-full"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 />
               </div>
+            </div>
+          )}
+          {c.reel_url && (
+            <div className="card overflow-hidden p-5">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
+                Reel <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-bold uppercase text-brand-600">{mediaKind(c.reel_url) === 'instagram' ? 'Instagram' : mediaKind(c.reel_url) === 'youtube' ? 'YouTube' : 'Video'}</span>
+              </h3>
+              {toEmbedUrl(c.reel_url) ? (
+                <div className="mx-auto aspect-[9/16] max-h-[560px] w-full max-w-[340px] overflow-hidden rounded-xl bg-slate-900">
+                  <iframe title={`${c.name} reel`} src={toEmbedUrl(c.reel_url)!} className="h-full w-full" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowFullScreen scrolling="no" />
+                </div>
+              ) : (
+                <a href={c.reel_url} target="_blank" rel="noreferrer" className="btn-outline w-full">Watch reel →</a>
+              )}
             </div>
           )}
           <div className="card p-5">

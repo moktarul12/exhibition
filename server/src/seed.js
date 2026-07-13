@@ -37,14 +37,24 @@ const galleryPhotos = [
   'photo-1431540015161-0bf868a2d407',
 ];
 
-// Bangalore venues used across live / upcoming / past shows
-const BLR = {
-  biec: { venue: 'BIEC (Bangalore International Exhibition Centre)', address: 'Tumkur Road, Dasarahalli, Bengaluru, Karnataka 562123', lat: 13.0716, lng: 77.4784 },
-  ktpo: { venue: 'KTPO Trade Centre', address: 'ITPL Main Road, Whitefield, Bengaluru, Karnataka 560066', lat: 12.9850, lng: 77.7360 },
-  palace: { venue: 'Palace Grounds', address: 'Jayamahal Main Road, Bengaluru, Karnataka 560006', lat: 12.9981, lng: 77.5920 },
-  lalit: { venue: 'The Lalit Ashok Convention Centre', address: 'Kumara Krupa High Road, Bengaluru, Karnataka 560001', lat: 12.9912, lng: 77.5850 },
-  manpho: { venue: 'Manpho Convention Centre', address: 'Hebbal Outer Ring Road, Bengaluru, Karnataka 560024', lat: 13.0358, lng: 77.5970 },
-  nimhans: { venue: 'NIMHANS Convention Centre', address: 'Hosur Road, Bengaluru, Karnataka 560029', lat: 12.9435, lng: 77.5964 },
+// Venues across major Indian cities used for live / upcoming / past shows
+const VENUE = {
+  // Bengaluru
+  biec: { venue: 'BIEC (Bangalore Intl. Exhibition Centre)', city: 'Bengaluru', address: 'Tumkur Road, Dasarahalli, Bengaluru, Karnataka 562123', lat: 13.0716, lng: 77.4784 },
+  ktpo: { venue: 'KTPO Trade Centre', city: 'Bengaluru', address: 'ITPL Main Road, Whitefield, Bengaluru, Karnataka 560066', lat: 12.9850, lng: 77.7360 },
+  palace: { venue: 'Palace Grounds', city: 'Bengaluru', address: 'Jayamahal Main Road, Bengaluru, Karnataka 560006', lat: 12.9981, lng: 77.5920 },
+  // Mumbai
+  nesco: { venue: 'Bombay Exhibition Centre (NESCO)', city: 'Mumbai', address: 'Western Express Highway, Goregaon East, Mumbai, Maharashtra 400063', lat: 19.1540, lng: 72.8500 },
+  jio: { venue: 'Jio World Convention Centre', city: 'Mumbai', address: 'BKC, Bandra East, Mumbai, Maharashtra 400051', lat: 19.0662, lng: 72.8676 },
+  // Delhi NCR
+  pragati: { venue: 'Bharat Mandapam, Pragati Maidan', city: 'New Delhi', address: 'Pragati Maidan, New Delhi 110001', lat: 28.6129, lng: 77.2500 },
+  yasho: { venue: 'Yashobhoomi (IICC Dwarka)', city: 'New Delhi', address: 'Sector 25, Dwarka, New Delhi 110077', lat: 28.5450, lng: 77.0640 },
+  // Hyderabad
+  hitex: { venue: 'HITEX Exhibition Centre', city: 'Hyderabad', address: 'Izzat Nagar, Kondapur, Hyderabad, Telangana 500084', lat: 17.4740, lng: 78.3760 },
+  // Chennai
+  ctc: { venue: 'Chennai Trade Centre', city: 'Chennai', address: 'Nandambakkam, Chennai, Tamil Nadu 600089', lat: 13.0110, lng: 80.1870 },
+  // Pune
+  autocluster: { venue: 'Auto Cluster Exhibition Centre', city: 'Pune', address: 'Chinchwad, Pune, Maharashtra 411019', lat: 18.6290, lng: 73.7997 },
 };
 
 const DEMO_YT = [
@@ -66,9 +76,9 @@ async function run() {
   // ---------------- Users ----------------
   const pass = (p) => bcrypt.hashSync(p, 10);
   const users = [
-    { name: 'Admin Organizer', email: 'admin@expohub.com', password: pass('admin123'), role: 'admin', phone: '+91 98765 00001', avatar: logo('Admin', '7c3aed') },
-    { name: 'Rajesh Verma', email: 'exhibitor@expohub.com', password: pass('demo123'), role: 'exhibitor', phone: '+91 98765 00002', avatar: logo('Rajesh Verma', '2563eb') },
-    { name: 'Rohit Sharma', email: 'visitor@expohub.com', password: pass('demo123'), role: 'visitor', phone: '+91 98765 00003', avatar: logo('Rohit Sharma', '059669') },
+    { name: 'Admin Organizer', email: 'admin@expomela.com', password: pass('admin123'), role: 'admin', phone: '+91 98765 00001', avatar: logo('Admin', '7c3aed') },
+    { name: 'Rajesh Verma', email: 'exhibitor@expomela.com', password: pass('demo123'), role: 'exhibitor', phone: '+91 98765 00002', avatar: logo('Rajesh Verma', '2563eb') },
+    { name: 'Rohit Sharma', email: 'visitor@expomela.com', password: pass('demo123'), role: 'visitor', phone: '+91 98765 00003', avatar: logo('Rohit Sharma', '059669') },
     { name: 'Priya Nair', email: 'priya@abcmachinery.com', password: pass('demo123'), role: 'exhibitor', phone: '+91 98765 00004', avatar: logo('Priya Nair', 'db2777') },
   ];
   const userIds = {};
@@ -82,7 +92,7 @@ async function run() {
 
   // ---------------- Companies ----------------
   const companies = [
-    { user: 'exhibitor@expohub.com', name: 'ABC Machinery Pvt. Ltd.', color: '1e3a8a', industry: 'Manufacturing & Packaging', about: 'ABC Machinery Pvt. Ltd. is a leading manufacturer of high quality plastic processing machinery with 20+ years of experience serving global markets.', website: 'www.abcmachinery.com', email: 'info@abcmachinery.com', phone: '+91 20 2456 5678', address: '12, Industrial Area, Phase 2, Pune', city: 'Pune', contact: 'Rajesh Verma', established: '2004', employees: '100-250' },
+    { user: 'exhibitor@expomela.com', name: 'ABC Machinery Pvt. Ltd.', color: '1e3a8a', industry: 'Manufacturing & Packaging', about: 'ABC Machinery Pvt. Ltd. is a leading manufacturer of high quality plastic processing machinery with 20+ years of experience serving global markets.', website: 'www.abcmachinery.com', email: 'info@abcmachinery.com', phone: '+91 20 2456 5678', address: '12, Industrial Area, Phase 2, Pune', city: 'Pune', contact: 'Rajesh Verma', established: '2004', employees: '100-250' },
     { user: 'priya@abcmachinery.com', name: 'GreenLeaf Foods', color: '059669', industry: 'Food & Beverage', about: 'Organic and processed food solutions for retail and HORECA. Trusted by 500+ brands across India.', website: 'www.greenleaffoods.in', email: 'hello@greenleaffoods.in', phone: '+91 22 4001 2233', address: '88, MIDC, Andheri East, Mumbai', city: 'Mumbai', contact: 'Priya Nair', established: '2011', employees: '50-100' },
     { user: null, name: 'RoboTech Automation', color: 'ea580c', industry: 'Industrial Automation', about: 'Robotic arms, PLC systems and smart factory integration.', website: 'www.robotech.io', email: 'sales@robotech.io', phone: '+91 80 5566 7788', address: 'Whitefield, Bengaluru', city: 'Bengaluru', contact: 'Arun Kumar', established: '2016', employees: '25-50' },
     { user: null, name: 'SolarNova Energy', color: 'f59e0b', industry: 'Renewable Energy', about: 'Solar EPC and rooftop solutions for industrial clients.', website: 'www.solarnova.co', email: 'info@solarnova.co', phone: '+91 79 3344 5566', address: 'GIDC, Ahmedabad', city: 'Ahmedabad', contact: 'Meera Shah', established: '2013', employees: '100-250' },
@@ -106,11 +116,12 @@ async function run() {
   const companyIds = {};
   for (const c of companies) {
     const r = await db.execute({
-      sql: `INSERT INTO companies (user_id,name,logo,industry,about,website,email,phone,address,city,contact_person,established,employees,youtube_url,brochure_url,documents)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      sql: `INSERT INTO companies (user_id,name,logo,industry,about,website,email,phone,address,city,contact_person,established,employees,youtube_url,reel_url,brochure_url,documents)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
         c.user ? userIds[c.user] : null, c.name, logo(c.name, c.color), c.industry, c.about, c.website, c.email, c.phone, c.address, c.city, c.contact, c.established, c.employees,
         'https://www.youtube.com/embed/aqz-KE-bpKQ',
+        'https://www.instagram.com/reel/C6h0Zc9Iu0y/',
         'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
         JSON.stringify([
           { name: 'Company Profile.pdf', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', type: 'pdf' },
@@ -142,23 +153,23 @@ async function run() {
   const gallery = JSON.stringify(galleryPhotos.map((g) => img(g, 800, 500)));
   const exhibitionDefs = [
     // Live now
-    { slug: 'india-plast-2026', name: 'India Plast 2026', tagline: 'The Largest Plastics & Polymer Show', industry: 'Plastics', banner: banners.plast, ...BLR.biec, org: 0, startOffset: -1, days: 4, status: 'live', price: 45000, visitorsToday: 4582, totalVisitors: 250000, tags: ['Trending', 'Most Booked', 'B2B'], b2b: 1, intl: 1, yt: DEMO_YT[0] },
-    { slug: 'foodtech-india-2026', name: 'FoodTech India 2026', tagline: 'Food Processing & Packaging Expo', industry: 'Food & Beverage', banner: banners.food, ...BLR.ktpo, org: 1, startOffset: -1, days: 4, status: 'live', price: 38000, visitorsToday: 3245, totalVisitors: 120000, tags: ['Live', 'Recommended'], b2b: 1, intl: 0, yt: DEMO_YT[1] },
-    { slug: 'automation-expo-2026', name: 'Automation Expo 2026', tagline: 'Smart Factory & Robotics', industry: 'Industrial Automation', banner: banners.auto, ...BLR.biec, org: 1, startOffset: 0, days: 3, status: 'live', price: 52000, visitorsToday: 3393, totalVisitors: 95000, tags: ['New Launch', 'B2B'], b2b: 1, intl: 1, yt: DEMO_YT[2] },
-    { slug: 'bengaluru-craft-fair-2026', name: 'Bengaluru Craft Fair 2026', tagline: 'Handicrafts & Lifestyle Bazaar', industry: 'Handicrafts', banner: banners.craft, ...BLR.palace, org: 2, startOffset: -2, days: 5, status: 'live', price: 28000, visitorsToday: 6120, totalVisitors: 80000, tags: ['Live', 'Free Entry', 'B2C'], b2b: 0, entryFree: 1, yt: DEMO_YT[3] },
-    { slug: 'hospitality-india-2026', name: 'Hospitality India 2026', tagline: 'Hotels, F&B & Banquet Solutions', industry: 'Hospitality', banner: banners.hotel, ...BLR.lalit, org: 0, startOffset: -1, days: 3, status: 'live', price: 48000, visitorsToday: 2100, totalVisitors: 45000, tags: ['Live', 'B2B'], b2b: 1, yt: DEMO_YT[0] },
+    { slug: 'india-plast-2026', name: 'India Plast 2026', tagline: 'The Largest Plastics & Polymer Show', industry: 'Plastics', banner: banners.plast, ...VENUE.biec, org: 0, startOffset: -1, days: 4, status: 'live', price: 45000, visitorsToday: 4582, totalVisitors: 250000, tags: ['Trending', 'Most Booked', 'B2B'], b2b: 1, intl: 1, yt: DEMO_YT[0] },
+    { slug: 'foodtech-india-2026', name: 'FoodTech India 2026', tagline: 'Food Processing & Packaging Expo', industry: 'Food & Beverage', banner: banners.food, ...VENUE.nesco, org: 1, startOffset: -1, days: 4, status: 'live', price: 38000, visitorsToday: 3245, totalVisitors: 120000, tags: ['Live', 'Recommended'], b2b: 1, intl: 0, yt: DEMO_YT[1] },
+    { slug: 'automation-expo-2026', name: 'Automation Expo 2026', tagline: 'Smart Factory & Robotics', industry: 'Industrial Automation', banner: banners.auto, ...VENUE.pragati, org: 1, startOffset: 0, days: 3, status: 'live', price: 52000, visitorsToday: 3393, totalVisitors: 95000, tags: ['New Launch', 'B2B'], b2b: 1, intl: 1, yt: DEMO_YT[2] },
+    { slug: 'india-craft-fair-2026', name: 'India Craft Fair 2026', tagline: 'Handicrafts & Lifestyle Bazaar', industry: 'Handicrafts', banner: banners.craft, ...VENUE.palace, org: 2, startOffset: -2, days: 5, status: 'live', price: 28000, visitorsToday: 6120, totalVisitors: 80000, tags: ['Live', 'Free Entry', 'B2C'], b2b: 0, entryFree: 1, yt: DEMO_YT[3] },
+    { slug: 'hospitality-india-2026', name: 'Hospitality India 2026', tagline: 'Hotels, F&B & Banquet Solutions', industry: 'Hospitality', banner: banners.hotel, ...VENUE.hitex, org: 0, startOffset: -1, days: 3, status: 'live', price: 48000, visitorsToday: 2100, totalVisitors: 45000, tags: ['Live', 'B2B'], b2b: 1, yt: DEMO_YT[0] },
     // Upcoming
-    { slug: 'renewable-energy-2026', name: 'Renewable Energy India 2026', tagline: 'Solar, Wind & Storage', industry: 'Renewable Energy', banner: banners.energy, ...BLR.biec, org: 2, startOffset: 15, days: 4, status: 'upcoming', price: 41000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Government'], early: 1, gov: 1, yt: DEMO_YT[1] },
-    { slug: 'print-pack-2026', name: 'Print & Pack 2026', tagline: 'Printing & Packaging Technology', industry: 'Printing & Packaging', banner: banners.print, ...BLR.ktpo, org: 0, startOffset: 32, days: 3, status: 'upcoming', price: 36000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Early Bird'], early: 1, yt: DEMO_YT[2] },
-    { slug: 'medtech-2026', name: 'MedTech India 2026', tagline: 'Medical Devices & Healthcare', industry: 'Medical Equipment', banner: banners.medical, ...BLR.nimhans, org: 1, startOffset: 48, days: 3, status: 'upcoming', price: 60000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'International'], intl: 1, entryFree: 1, yt: DEMO_YT[3] },
-    { slug: 'smart-home-expo-2026', name: 'Smart Home Expo 2026', tagline: 'IoT Living & Home Automation', industry: 'Home Automation', banner: banners.home, ...BLR.manpho, org: 1, startOffset: 60, days: 3, status: 'upcoming', price: 35000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'New Launch'], early: 1, yt: DEMO_YT[0] },
-    { slug: 'logistics-india-2026', name: 'Logistics India 2026', tagline: 'Warehousing, Freight & Expo Logistics', industry: 'Logistics', banner: banners.logistics, ...BLR.biec, org: 0, startOffset: 75, days: 3, status: 'upcoming', price: 40000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'B2B'], b2b: 1, yt: DEMO_YT[1] },
-    { slug: 'bengaluru-lifestyle-2026', name: 'Bengaluru Lifestyle Expo 2026', tagline: 'Crafts, Décor & Fashion', industry: 'Handicrafts', banner: banners.craft, ...BLR.palace, org: 2, startOffset: 90, days: 4, status: 'upcoming', price: 22000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Free Entry'], entryFree: 1, yt: DEMO_YT[2] },
+    { slug: 'renewable-energy-2026', name: 'Renewable Energy India 2026', tagline: 'Solar, Wind & Storage', industry: 'Renewable Energy', banner: banners.energy, ...VENUE.ctc, org: 2, startOffset: 15, days: 4, status: 'upcoming', price: 41000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Government'], early: 1, gov: 1, yt: DEMO_YT[1] },
+    { slug: 'print-pack-2026', name: 'Print & Pack 2026', tagline: 'Printing & Packaging Technology', industry: 'Printing & Packaging', banner: banners.print, ...VENUE.ktpo, org: 0, startOffset: 32, days: 3, status: 'upcoming', price: 36000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Early Bird'], early: 1, yt: DEMO_YT[2] },
+    { slug: 'medtech-2026', name: 'MedTech India 2026', tagline: 'Medical Devices & Healthcare', industry: 'Medical Equipment', banner: banners.medical, ...VENUE.hitex, org: 1, startOffset: 48, days: 3, status: 'upcoming', price: 60000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'International'], intl: 1, entryFree: 1, yt: DEMO_YT[3] },
+    { slug: 'smart-home-expo-2026', name: 'Smart Home Expo 2026', tagline: 'IoT Living & Home Automation', industry: 'Home Automation', banner: banners.home, ...VENUE.autocluster, org: 1, startOffset: 60, days: 3, status: 'upcoming', price: 35000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'New Launch'], early: 1, yt: DEMO_YT[0] },
+    { slug: 'logistics-india-2026', name: 'Logistics India 2026', tagline: 'Warehousing, Freight & Expo Logistics', industry: 'Logistics', banner: banners.logistics, ...VENUE.jio, org: 0, startOffset: 75, days: 3, status: 'upcoming', price: 40000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'B2B'], b2b: 1, yt: DEMO_YT[1] },
+    { slug: 'india-lifestyle-2026', name: 'India Lifestyle Expo 2026', tagline: 'Crafts, Décor & Fashion', industry: 'Handicrafts', banner: banners.craft, ...VENUE.yasho, org: 2, startOffset: 90, days: 4, status: 'upcoming', price: 22000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Free Entry'], entryFree: 1, yt: DEMO_YT[2] },
     // Past
-    { slug: 'india-plast-2025', name: 'India Plast 2025', tagline: 'Plastics & Polymer Show', industry: 'Plastics', banner: banners.plast, ...BLR.biec, org: 0, startOffset: -365, days: 4, status: 'past', price: 42000, visitorsToday: 0, totalVisitors: 235000, tags: ['Past'], yt: DEMO_YT[3] },
-    { slug: 'textile-expo-2025', name: 'Textile Expo 2025', tagline: 'Weaving & Spinning Machinery', industry: 'Textile Machinery', banner: banners.textile, ...BLR.ktpo, org: 2, startOffset: -200, days: 3, status: 'past', price: 33000, visitorsToday: 0, totalVisitors: 88000, tags: ['Past'], yt: DEMO_YT[0] },
-    { slug: 'auto-components-2025', name: 'Auto Components Expo 2025', tagline: 'OEM Parts & EV Supply Chain', industry: 'Automotive', banner: banners.auto, ...BLR.biec, org: 1, startOffset: -120, days: 3, status: 'past', price: 39000, visitorsToday: 0, totalVisitors: 52000, tags: ['Past'], yt: DEMO_YT[1] },
-    { slug: 'bengaluru-print-2025', name: 'Bengaluru Print Fair 2025', tagline: 'Print Media & Packaging', industry: 'Printing & Packaging', banner: banners.print, ...BLR.manpho, org: 0, startOffset: -90, days: 4, status: 'past', price: 30000, visitorsToday: 0, totalVisitors: 41000, tags: ['Past'], yt: DEMO_YT[2] },
+    { slug: 'india-plast-2025', name: 'India Plast 2025', tagline: 'Plastics & Polymer Show', industry: 'Plastics', banner: banners.plast, ...VENUE.biec, org: 0, startOffset: -365, days: 4, status: 'past', price: 42000, visitorsToday: 0, totalVisitors: 235000, tags: ['Past'], yt: DEMO_YT[3] },
+    { slug: 'textile-expo-2025', name: 'Textile Expo 2025', tagline: 'Weaving & Spinning Machinery', industry: 'Textile Machinery', banner: banners.textile, ...VENUE.ctc, org: 2, startOffset: -200, days: 3, status: 'past', price: 33000, visitorsToday: 0, totalVisitors: 88000, tags: ['Past'], yt: DEMO_YT[0] },
+    { slug: 'auto-components-2025', name: 'Auto Components Expo 2025', tagline: 'OEM Parts & EV Supply Chain', industry: 'Automotive', banner: banners.auto, ...VENUE.autocluster, org: 1, startOffset: -120, days: 3, status: 'past', price: 39000, visitorsToday: 0, totalVisitors: 52000, tags: ['Past'], yt: DEMO_YT[1] },
+    { slug: 'india-print-2025', name: 'India Print Fair 2025', tagline: 'Print Media & Packaging', industry: 'Printing & Packaging', banner: banners.print, ...VENUE.nesco, org: 0, startOffset: -90, days: 4, status: 'past', price: 30000, visitorsToday: 0, totalVisitors: 41000, tags: ['Past'], yt: DEMO_YT[2] },
   ];
 
   const exhibitionIds = {};
@@ -167,15 +178,15 @@ async function run() {
     const end = addDays(start, e.days - 1);
     const r = await db.execute({
       sql: `INSERT INTO exhibitions
-        (slug,name,tagline,industry,about,banner,venue,city,lat,lng,organizer_id,start_date,end_date,status,price_from,visitors_today,total_visitors,entry_free,international,government,b2b,early_bird,tags,gallery,youtube_url,address)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        (slug,name,tagline,industry,about,banner,venue,city,lat,lng,organizer_id,start_date,end_date,status,price_from,visitors_today,total_visitors,entry_free,international,government,b2b,early_bird,tags,gallery,youtube_url,reel_url,address)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
         e.slug, e.name, e.tagline, e.industry,
-        `${e.name} brings together the entire ${e.industry.toLowerCase()} ecosystem under one roof at ${e.venue}, Bengaluru. Featuring live demonstrations, product launches, knowledge sessions and B2B networking for manufacturers, suppliers and buyers.`,
-        img(e.banner, 1200, 500), e.venue, 'Bengaluru', e.lat, e.lng, organizerIds[e.org],
+        `${e.name} brings together the entire ${e.industry.toLowerCase()} ecosystem under one roof at ${e.venue}, ${e.city}. Featuring live demonstrations, product launches, knowledge sessions and B2B networking for manufacturers, suppliers and buyers.`,
+        img(e.banner, 1200, 500), e.venue, e.city, e.lat, e.lng, organizerIds[e.org],
         iso(start), iso(end), e.status, e.price, e.visitorsToday, e.totalVisitors,
         e.entryFree ? 1 : 0, e.intl ? 1 : 0, e.gov ? 1 : 0, e.b2b ? 1 : 0, e.early ? 1 : 0,
-        JSON.stringify(e.tags), gallery, e.yt, e.address,
+        JSON.stringify(e.tags), gallery, e.yt, 'https://www.instagram.com/reel/C6h0Zc9Iu0y/', e.address,
       ],
     });
     exhibitionIds[e.slug] = Number(r.lastInsertRowid);
@@ -227,12 +238,13 @@ async function run() {
           const facilities = JSON.stringify(['Electricity 15A', 'Wi‑Fi', 'Spotlights', 'Carpet', 'Fascia board', isPremium ? 'LED TV' : 'Table + 2 chairs']);
           const description = `${isPremium ? 'Premium' : 'Standard'} ${isCorner ? 'corner' : 'inline'} stall in ${hallName}. Ideal for product demos and B2B meetings. Includes basic booth package.`;
           await db.execute({
-            sql: `INSERT INTO stalls (hall_id,code,zone,type,status,width,depth,area,price,grid_row,grid_col,booked_by_company_id,description,facilities,youtube_url,brochure_url,documents)
-                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-            args: [
+            sql: `INSERT INTO stalls (hall_id,code,zone,type,status,width,depth,area,price,grid_row,grid_col,booked_by_company_id,description,facilities,youtube_url,reel_url,brochure_url,documents)
+                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      args: [
               hallId, code, isPremium ? 'Premium' : 'Standard', isCorner ? 'Corner' : 'Standard', status, 3, 3, 9, price, row, col, bookedBy,
               description, facilities,
               'https://www.youtube.com/embed/ScMzIvxBSi4',
+              'https://www.instagram.com/reel/C6h0Zc9Iu0y/',
               'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
               JSON.stringify([
                 { name: 'Stall Layout.pdf', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', type: 'pdf' },
@@ -289,8 +301,8 @@ async function run() {
   }
   let bookingSeq = 1001;
   const demoBookings = [
-    { user: 'exhibitor@expohub.com', company: 'ABC Machinery Pvt. Ltd.', slug: 'india-plast-2026', payStatus: 'paid', payMode: 'Bank Transfer' },
-    { user: 'exhibitor@expohub.com', company: 'ABC Machinery Pvt. Ltd.', slug: 'automation-expo-2026', payStatus: 'pending', payMode: 'UPI' },
+    { user: 'exhibitor@expomela.com', company: 'ABC Machinery Pvt. Ltd.', slug: 'india-plast-2026', payStatus: 'paid', payMode: 'Bank Transfer' },
+    { user: 'exhibitor@expomela.com', company: 'ABC Machinery Pvt. Ltd.', slug: 'automation-expo-2026', payStatus: 'pending', payMode: 'UPI' },
     { user: 'priya@abcmachinery.com', company: 'GreenLeaf Foods', slug: 'foodtech-india-2026', payStatus: 'paid', payMode: 'Credit Card' },
   ];
   for (const b of demoBookings) {
@@ -318,7 +330,7 @@ async function run() {
   for (const n of notifs) {
     await db.execute({
       sql: `INSERT INTO notifications (user_id,title,body,type) VALUES (?,?,?,?)`,
-      args: [userIds['visitor@expohub.com'], ...n],
+      args: [userIds['visitor@expomela.com'], ...n],
     });
   }
 
@@ -335,17 +347,17 @@ async function run() {
       sql: `INSERT INTO messages (company_id,exhibition_id,from_user_id,from_name,from_email,from_phone,subject,body,status)
             VALUES (?,?,?,?,?,?,?,?,?)`,
       args: [
-        companyIds[m.company], exhibitionIds['india-plast-2026'], userIds['visitor@expohub.com'],
-        'Rohit Sharma', 'visitor@expohub.com', '+91 98765 00003', m.subject, m.body, 'unread',
+        companyIds[m.company], exhibitionIds['india-plast-2026'], userIds['visitor@expomela.com'],
+        'Rohit Sharma', 'visitor@expomela.com', '+91 98765 00003', m.subject, m.body, 'unread',
       ],
     });
   }
 
   console.log(`[seed] Done. Users: ${users.length}, Companies: ${companies.length}, Exhibitions: ${exhibitionDefs.length}, Stalls: ${totalStalls}`);
   console.log('[seed] Logins:');
-  console.log('  admin@expohub.com / admin123   (Organizer/Admin)');
-  console.log('  exhibitor@expohub.com / demo123 (Exhibitor / Company)');
-  console.log('  visitor@expohub.com / demo123   (Visitor / Guest)');
+  console.log('  admin@expomela.com / admin123   (Organizer/Admin)');
+  console.log('  exhibitor@expomela.com / demo123 (Exhibitor / Company)');
+  console.log('  visitor@expomela.com / demo123   (Visitor / Guest)');
 }
 
 run().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });

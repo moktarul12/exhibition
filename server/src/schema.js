@@ -29,6 +29,7 @@ export const SCHEMA_STATEMENTS = [
     established TEXT,
     employees TEXT,
     youtube_url TEXT,
+    reel_url TEXT,
     brochure_url TEXT,
     documents TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -72,6 +73,7 @@ export const SCHEMA_STATEMENTS = [
     tags TEXT, -- JSON array of chips (Trending, New Launch, etc.)
     gallery TEXT, -- JSON array of image urls
     youtube_url TEXT,
+    reel_url TEXT,
     address TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (organizer_id) REFERENCES organizers(id)
@@ -103,6 +105,7 @@ export const SCHEMA_STATEMENTS = [
     description TEXT,
     facilities TEXT,
     youtube_url TEXT,
+    reel_url TEXT,
     brochure_url TEXT,
     documents TEXT,
     FOREIGN KEY (hall_id) REFERENCES halls(id),

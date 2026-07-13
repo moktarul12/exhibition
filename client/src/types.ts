@@ -36,6 +36,7 @@ export interface Exhibition {
   tags: string[];
   gallery: string[];
   youtube_url?: string;
+  reel_url?: string;
   address?: string;
   total_stalls?: number;
   available_stalls?: number;
@@ -89,6 +90,7 @@ export interface Stall {
   description?: string;
   facilities?: string[];
   youtube_url?: string;
+  reel_url?: string;
   brochure_url?: string;
   documents?: MediaDoc[];
   nearby?: { code: string; status: StallStatus }[];
@@ -109,6 +111,7 @@ export interface Company {
   established: string;
   employees: string;
   youtube_url?: string;
+  reel_url?: string;
   brochure_url?: string;
   documents?: MediaDoc[];
   history?: { name: string; start_date: string; end_date: string; hall_name: string; stall_code: string; slug: string }[];

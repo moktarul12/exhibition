@@ -2,9 +2,15 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
 import { initSchema } from './schema.js';
 import { signToken, authRequired, requireRole, authOptional } from './auth.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const clientDist = path.resolve(__dirname, '..', '..', 'client', 'dist');
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN?.split(',') || '*' }));
@@ -24,7 +30,7 @@ function mapExhibition(e) {
 }
 
 // ---------------- Health ----------------
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'ExpoHub API' }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'Expo Mela API' }));
 
 // ---------------- Auth ----------------
 app.post('/api/auth/register', async (req, res) => {
@@ -245,6 +251,26 @@ app.get('/api/companies/:id', async (req, res) => {
   });
 });
 
+// Exhibitor updates their own company media (reel / youtube / brochure links)
+app.patch('/api/companies/mine', authRequired, async (req, res) => {
+  try {
+    const company = one(await db.execute({ sql: 'SELECT * FROM companies WHERE user_id=?', args: [req.user.id] }));
+    if (!company) return res.status(404).json({ error: 'No company linked to this account' });
+    const { youtube_url, reel_url, brochure_url } = req.body;
+    await db.execute({
+      sql: 'UPDATE companies SET youtube_url=?, reel_url=?, brochure_url=? WHERE id=?',
+      args: [
+        youtube_url !== undefined ? (youtube_url || null) : company.youtube_url,
+        reel_url !== undefined ? (reel_url || null) : company.reel_url,
+        brochure_url !== undefined ? (brochure_url || null) : company.brochure_url,
+        company.id,
+      ],
+    });
+    const updated = one(await db.execute({ sql: 'SELECT * FROM companies WHERE id=?', args: [company.id] }));
+    res.json({ ...updated, documents: parseJSON(updated.documents, []) });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Failed to update company media' }); }
+});
+
 // ---------------- Messages (visitor → company) ----------------
 app.post('/api/messages', authOptional, async (req, res) => {
   try {
@@ -364,7 +390,18 @@ app.patch('/api/admin/stalls/:id', authRequired, requireRole('admin'), async (re
   res.json({ ...s, status: newStatus, price: newPrice });
 });
 
+// ---------------- Serve built React app (production) ----------------
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  // SPA fallback: send index.html for any non-API GET route
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+  console.log(`[web] Serving client from ${clientDist}`);
+}
+
 const PORT = process.env.PORT || 4000;
 initSchema()
-  .then(() => app.listen(PORT, () => console.log(`[api] ExpoHub API running on http://localhost:${PORT}`)))
+  .then(() => app.listen(PORT, () => console.log(`[api] Expo Mela API running on http://localhost:${PORT}`)))
   .catch((e) => { console.error('Failed to init schema', e); process.exit(1); });

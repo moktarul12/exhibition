@@ -6,6 +6,7 @@ import { StatusBadge, Spinner } from '../components/ui';
 import FloorPlan from '../components/FloorPlan';
 import { MapPin, Calendar, Users, Grid, Ticket, Building, Clock, Globe, Phone, Mail, ArrowRight, Star } from '../components/icons';
 import { useAuth } from '../auth';
+import { toEmbedUrl, mediaKind } from '../media';
 
 type Detail = Exhibition & { organizer: Organizer; halls: Hall[]; seminars: Seminar[]; exhibitors: (Company & { stall_code: string; hall_name: string })[] };
 
@@ -168,7 +169,7 @@ function Overview({ data, mapSrc, onFloor, onTab, onPhoto, canBook }: { data: De
           <h2 className="font-display text-xl font-extrabold text-ink-900">About the exhibition</h2>
           <p className="mt-3 leading-relaxed text-ink-600">{data.about}</p>
           <div className="mt-5 flex flex-wrap gap-2">
-            <Chip>{data.industry}</Chip><Chip>Bengaluru</Chip>
+            <Chip>{data.industry}</Chip><Chip>{data.city}</Chip>
             {data.b2b ? <Chip>B2B</Chip> : null}
             {data.international ? <Chip>International</Chip> : null}
             {data.government ? <Chip>Government</Chip> : null}
@@ -199,12 +200,12 @@ function Overview({ data, mapSrc, onFloor, onTab, onPhoto, canBook }: { data: De
             <div className="h-40 overflow-hidden bg-ink-100"><iframe title="Map preview" src={mapSrc} className="pointer-events-none h-full w-full border-0" loading="lazy" /></div>
             <div className="flex items-center justify-between p-4"><span className="font-semibold text-ink-900">Venue location</span><span className="text-sm font-semibold text-brand-600">Open map →</span></div>
           </button>
-          {data.youtube_url && (
+          {(data.youtube_url || data.reel_url) && (
             <button onClick={() => onTab('Video')} className="card overflow-hidden text-left transition-shadow hover:shadow-soft">
               <div className="relative h-40 bg-ink-950">
-                <iframe title="Reel preview" src={data.youtube_url} className="pointer-events-none h-full w-full border-0" />
+                <iframe title="Reel preview" src={toEmbedUrl(data.youtube_url) || toEmbedUrl(data.reel_url) || data.youtube_url} className="pointer-events-none h-full w-full border-0" />
               </div>
-              <div className="flex items-center justify-between p-4"><span className="font-semibold text-ink-900">Venue reel</span><span className="text-sm font-semibold text-brand-600">Watch →</span></div>
+              <div className="flex items-center justify-between p-4"><span className="font-semibold text-ink-900">Video & reels</span><span className="text-sm font-semibold text-brand-600">Watch →</span></div>
             </button>
           )}
         </section>
@@ -274,7 +275,7 @@ function Location({ data, mapSrc, mapLink }: { data: Detail; mapSrc: string; map
         <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600"><MapPin width={24} /></div>
         <Field label="Venue" value={data.venue} big />
         <Field label="Address" value={data.address || `${data.venue}, ${data.city}`} />
-        <Field label="City" value="Bengaluru, Karnataka" />
+        <Field label="City" value={data.city} />
         {data.lat != null && data.lng != null && <Field label="Coordinates" value={`${data.lat.toFixed(4)}, ${data.lng.toFixed(4)}`} />}
         <a href={mapLink} target="_blank" rel="noreferrer" className="btn-primary w-full"><MapPin width={16} /> Open in Google Maps</a>
       </div>
@@ -283,15 +284,34 @@ function Location({ data, mapSrc, mapLink }: { data: Detail; mapSrc: string; map
 }
 
 function Video({ data }: { data: Detail }) {
+  const videoSrc = toEmbedUrl(data.youtube_url);
+  const reelSrc = toEmbedUrl(data.reel_url);
   return (
-    <div className="mx-auto max-w-4xl">
-      <h2 className="mb-1 font-display text-xl font-extrabold text-ink-900">Exhibition reel</h2>
+    <div className="mx-auto max-w-5xl">
+      <h2 className="mb-1 font-display text-xl font-extrabold text-ink-900">Exhibition video & reels</h2>
       <p className="mb-5 text-sm text-ink-500">A short walkthrough of the venue and the exhibition experience.</p>
-      {data.youtube_url ? (
-        <div className="aspect-video overflow-hidden rounded-3xl bg-ink-950 shadow-soft">
-          <iframe title={`${data.name} video`} src={data.youtube_url} className="h-full w-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+      {!videoSrc && !reelSrc ? (
+        <div className="card py-16 text-center text-ink-500">Video coming soon.</div>
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
+          {videoSrc && (
+            <div>
+              <div className="mb-2 text-sm font-semibold text-ink-700">Highlights video</div>
+              <div className="aspect-video overflow-hidden rounded-3xl bg-ink-950 shadow-soft">
+                <iframe title={`${data.name} video`} src={videoSrc} className="h-full w-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+              </div>
+            </div>
+          )}
+          {reelSrc && (
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink-700">Reel <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-bold uppercase text-brand-600">{mediaKind(data.reel_url) === 'instagram' ? 'Instagram' : 'Short'}</span></div>
+              <div className="mx-auto aspect-[9/16] max-h-[560px] w-full max-w-[320px] overflow-hidden rounded-3xl bg-ink-950 shadow-soft">
+                <iframe title={`${data.name} reel`} src={reelSrc} className="h-full w-full border-0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowFullScreen scrolling="no" />
+              </div>
+            </div>
+          )}
         </div>
-      ) : <div className="card py-16 text-center text-ink-500">Video coming soon.</div>}
+      )}
     </div>
   );
 }
@@ -355,7 +375,7 @@ function Gallery({ data, onPhoto }: { data: Detail; onPhoto: (s: string) => void
 
 function FAQs({ data }: { data: Detail }) {
   const faqs = [
-    { q: 'Where is this exhibition held?', a: `All ExpoHub exhibitions are in Bengaluru. This one is at ${data.venue}${data.address ? ` — ${data.address}` : ''}.` },
+    { q: 'Where is this exhibition held?', a: `This exhibition is held in ${data.city} at ${data.venue}${data.address ? ` — ${data.address}` : ''}.` },
     { q: 'How do I book a stall?', a: 'Open the Floor plan tab, click any green (available) stall, fill your company details and confirm — it books instantly. (Exhibitor login required.)' },
     { q: 'What is included in the stall price?', a: 'Standard stalls include fascia name board, carpet, two chairs, a table, spotlights and a power socket. Corner and premium zones cost slightly more.' },
     { q: 'Can I get a refund?', a: 'Cancellations up to 30 days before the event are eligible for a refund minus processing charges.' },

@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { api, formatINR, formatDate } from '../api';
 import { Spinner, Stat } from '../components/ui';
 import { useAuth } from '../auth';
-import { Ticket, Mail, Building, ArrowRight, Grid } from '../components/icons';
+import { Ticket, Mail, Building, ArrowRight, Grid, Check, Download } from '../components/icons';
+import { toEmbedUrl, mediaKind } from '../media';
+import type { Company } from '../types';
 
 interface InboxMsg {
   id: number;
@@ -23,14 +25,17 @@ export default function CompanyDashboard() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [messages, setMessages] = useState<InboxMsg[]>([]);
   const [loading, setLoading] = useState(true);
+  const [company, setCompany] = useState<Company | null>(null);
 
   useEffect(() => {
     Promise.all([
       api.get('/bookings/mine'),
       api.get('/messages/inbox').catch(() => ({ data: [] })),
-    ]).then(([b, m]) => {
+      api.get('/auth/me').catch(() => ({ data: {} })),
+    ]).then(([b, m, me]) => {
       setBookings(b.data);
       setMessages(m.data);
+      setCompany(me.data?.company || null);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -59,6 +64,8 @@ export default function CompanyDashboard() {
           <div><div className="text-sm font-bold text-slate-900">Book a Stall</div><div className="text-xs text-slate-500">Find live exhibitions</div></div>
         </Link>
       </div>
+
+      <MediaEditor company={company} onSaved={setCompany} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="card overflow-hidden">
@@ -116,6 +123,106 @@ export default function CompanyDashboard() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function MediaEditor({ company, onSaved }: { company: Company | null; onSaved: (c: Company) => void }) {
+  const [form, setForm] = useState({ youtube_url: '', reel_url: '', brochure_url: '' });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (company) setForm({
+      youtube_url: company.youtube_url || '',
+      reel_url: company.reel_url || '',
+      brochure_url: company.brochure_url || '',
+    });
+  }, [company]);
+
+  if (!company) {
+    return (
+      <div className="card mb-6 p-5 text-sm text-slate-500">
+        No company profile is linked to your account yet, so media can't be added. Book a stall to create your company profile.
+      </div>
+    );
+  }
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true); setError(''); setSaved(false);
+    try {
+      const r = await api.patch('/companies/mine', form);
+      onSaved(r.data);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Failed to save media');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const reelPreview = toEmbedUrl(form.reel_url);
+  const videoPreview = toEmbedUrl(form.youtube_url);
+
+  return (
+    <div className="card mb-6 overflow-hidden">
+      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Media & Reels</h3>
+          <p className="text-xs text-slate-500">Add a YouTube video or an Instagram / YouTube reel link — it shows on your public profile.</p>
+        </div>
+        <a href={`/company/${company.id}`} className="text-xs font-semibold text-brand-600">View profile →</a>
+      </div>
+      <form onSubmit={save} className="grid gap-5 p-5 lg:grid-cols-[1.4fr_1fr]">
+        <div className="space-y-3">
+          {error && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+          <div>
+            <label className="label">YouTube video link</label>
+            <input className="input" placeholder="https://youtube.com/watch?v=…" value={form.youtube_url} onChange={(e) => setForm({ ...form, youtube_url: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Reel link (Instagram or YouTube Shorts)</label>
+            <input className="input" placeholder="https://instagram.com/reel/… or https://youtube.com/shorts/…" value={form.reel_url} onChange={(e) => setForm({ ...form, reel_url: e.target.value })} />
+            {form.reel_url && (
+              <p className="mt-1 text-xs text-slate-500">
+                Detected: <b className="uppercase">{mediaKind(form.reel_url)}</b>{!reelPreview && ' · link will open in a new tab (can’t be embedded)'}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="label">Brochure / PDF link</label>
+            <input className="input" placeholder="https://…/brochure.pdf" value={form.brochure_url} onChange={(e) => setForm({ ...form, brochure_url: e.target.value })} />
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <button className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save media'}</button>
+            {saved && <span className="flex items-center gap-1 text-sm font-semibold text-emerald-600"><Check width={16} /> Saved</span>}
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div className="text-xs font-bold uppercase tracking-wide text-slate-400">Live preview</div>
+          {videoPreview && (
+            <div className="aspect-video overflow-hidden rounded-xl bg-slate-900">
+              <iframe title="Video preview" src={videoPreview} className="h-full w-full" allowFullScreen />
+            </div>
+          )}
+          {reelPreview && (
+            <div className="mx-auto aspect-[9/16] max-h-72 w-full max-w-[220px] overflow-hidden rounded-xl bg-slate-900">
+              <iframe title="Reel preview" src={reelPreview} className="h-full w-full" allowFullScreen scrolling="no" />
+            </div>
+          )}
+          {form.brochure_url && (
+            <a href={form.brochure_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+              <Download width={16} className="text-brand-600" /> Open brochure
+            </a>
+          )}
+          {!videoPreview && !reelPreview && !form.brochure_url && (
+            <div className="grid place-items-center rounded-xl border border-dashed border-slate-200 py-10 text-center text-xs text-slate-400">Paste a link to see a preview here.</div>
+          )}
+        </div>
+      </form>
     </div>
   );
 }

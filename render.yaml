@@ -1,0 +1,27 @@
+# Render Blueprint for Expo Mela (expomela.com)
+# Single Node web service: Express serves the REST API AND the built React SPA.
+# Deploy: push this repo to GitHub, then in Render → New → Blueprint → pick the repo.
+services:
+  - type: web
+    name: expo-mela
+    runtime: node
+    plan: free
+    region: singapore # closest Render region to India; also: oregon, frankfurt, ohio, virginia
+    # Installs client+server deps, builds the React app, seeds the demo database.
+    buildCommand: npm run render-build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20.11.1"
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true # Render generates a strong secret
+      # ---- Optional: use a persistent Turso DB instead of the ephemeral local file ----
+      # Without these, a fresh demo DB is seeded on every build/restart (fine for a demo).
+      # - key: TURSO_DATABASE_URL
+      #   sync: false
+      # - key: TURSO_AUTH_TOKEN
+      #   sync: false

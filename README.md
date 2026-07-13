@@ -1,10 +1,12 @@
-# ExpoHub — Exhibition & Stall Booking Platform
+# Expo Mela — Exhibition & Stall Booking Platform
+
+> expomela.com
 
 A full, BookMyShow-style platform for **discovering exhibitions and booking stalls in real time**, with an interactive floor plan, role-based auth (Visitor / Exhibitor / Organizer-Admin), and an organizer analytics dashboard.
 
 Built with **React (Vite + TypeScript + Tailwind)** on the frontend and an **Express API backed by Turso (libSQL)**. It runs 100% out of the box against a local libSQL file, and switches to a **live Turso database** the moment you add credentials.
 
-![ExpoHub](./stall1.png)
+![Expo Mela](./stall1.png)
 
 ---
 
@@ -41,9 +43,9 @@ Then open **http://localhost:5173**.
 
 | Role                | Email                   | Password  |
 | ------------------- | ----------------------- | --------- |
-| Organizer / Admin   | `admin@expohub.com`     | `admin123`|
-| Exhibitor           | `exhibitor@expohub.com` | `demo123` |
-| Visitor             | `visitor@expohub.com`   | `demo123` |
+| Organizer / Admin   | `admin@expomela.com`     | `admin123`|
+| Exhibitor           | `exhibitor@expomela.com` | `demo123` |
+| Visitor             | `visitor@expomela.com`   | `demo123` |
 
 The login page has one-click buttons to auto-fill each demo account.
 
