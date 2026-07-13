@@ -11,7 +11,7 @@
     "dev": "concurrently -n server,client -c blue,magenta \"npm run dev:server\" \"npm run dev:client\"",
     "build": "npm --prefix client run build",
     "start": "npm --prefix server start",
-    "render-build": "npm run install:all && npm --prefix client run build && npm --prefix server run seed",
+    "render-build": "npm install && npm --prefix server install && npm --prefix client install --include=dev && npm --prefix client run build && npm --prefix server run seed",
     "setup": "npm run install:all && npm run seed"
   },
   "devDependencies": {
