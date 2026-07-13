@@ -4,15 +4,17 @@
 
 :root {
   color-scheme: light;
-  --brand: #b00d42;
-  --brand-hover: #8f0f3c;
-  --brand-bright: #e93765;
-  --brand-soft: #ffe0e7;
-  --brand-ring: #ffc6d3;
-  --ink: #161119;
-  --paper: #faf7f8;
-  --text-main: #1c1720;
-  --text-muted: #6b6270;
+  --brand: #d6206e;
+  --brand-hover: #b81560;
+  --brand-bright: #e0207a;
+  --brand-soft: #fce7f3;
+  --brand-ring: #fbcfe8;
+  --grape: #7c3aed;
+  --grad: linear-gradient(120deg, #e0207a 0%, #b21caf 50%, #7c3aed 100%);
+  --ink: #151321;
+  --paper: #ffffff;
+  --text-main: #1a1730;
+  --text-muted: #6b6485;
 }
 
 html, body, #root {
@@ -41,11 +43,11 @@ h1, h2, h3, h4, .font-display {
   }
   .btn-primary {
     @apply btn text-white;
-    background-image: linear-gradient(120deg, var(--brand-bright), var(--brand));
-    box-shadow: 0 8px 20px -8px rgba(178,13,66,0.55);
+    background-image: var(--grad);
+    box-shadow: 0 10px 24px -10px rgba(214,32,110,0.6);
   }
   .btn-primary:hover {
-    box-shadow: 0 12px 26px -8px rgba(178,13,66,0.7);
+    box-shadow: 0 16px 30px -10px rgba(124,58,237,0.6);
     transform: translateY(-1px);
   }
   .btn-outline {
@@ -103,13 +105,20 @@ h1, h2, h3, h4, .font-display {
   .bg-brand-soft { background-color: var(--brand-soft); }
   .border-brand { border-color: var(--brand); }
   .link-brand { color: var(--brand); @apply font-semibold hover:underline; }
+  .bg-grad { background-image: var(--grad); }
+  .text-grad {
+    background-image: var(--grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
 
 .mesh {
   background:
-    radial-gradient(60% 60% at 80% 10%, rgba(233,55,101,0.35) 0%, transparent 60%),
-    radial-gradient(50% 50% at 10% 20%, rgba(178,13,66,0.30) 0%, transparent 55%),
-    radial-gradient(60% 80% at 50% 120%, rgba(120,10,55,0.45) 0%, transparent 60%);
+    radial-gradient(60% 60% at 80% 10%, rgba(224,32,122,0.38) 0%, transparent 60%),
+    radial-gradient(55% 55% at 12% 20%, rgba(124,58,237,0.40) 0%, transparent 58%),
+    radial-gradient(60% 80% at 50% 120%, rgba(107,16,53,0.45) 0%, transparent 60%);
 }
 
 ::-webkit-scrollbar { height: 9px; width: 9px; }

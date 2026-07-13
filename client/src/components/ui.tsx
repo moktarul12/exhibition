@@ -1,18 +1,23 @@
 import { ReactNode } from 'react';
 import type { StallStatus } from '../types';
 
-export function Logo({ light = false }: { light?: boolean }) {
+export function Logo({ light = false, withTagline = false }: { light?: boolean; withTagline?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="relative grid h-9 w-9 place-items-center rounded-2xl shadow-lift"
-        style={{ backgroundImage: 'linear-gradient(135deg, #e93765, #b00d42 55%, #7a1238)' }}>
+      <span className="relative grid h-10 w-10 place-items-center shadow-lift"
+        style={{ backgroundImage: 'linear-gradient(135deg, #e0207a, #b21caf 50%, #7c3aed)', clipPath: 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)' }}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
           <path d="M4 20V8l8-4 8 4v12" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
           <path d="M8 20v-6h8v6M4 12h16" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
-      <span className={`font-display text-[1.35rem] font-extrabold leading-none tracking-tight ${light ? 'text-white' : 'text-ink-900'}`}>
-        Expo<span className="text-brand">Mela</span>
+      <span className="flex flex-col leading-none">
+        <span className={`font-display text-[1.3rem] font-extrabold tracking-tight ${light ? 'text-white' : 'text-ink-900'}`}>
+          Expo<span className="text-grad">Mela</span>
+        </span>
+        {withTagline && (
+          <span className={`mt-1 text-[10px] font-semibold tracking-wide ${light ? 'text-white/50' : 'text-ink-400'}`}>Exhibit. Connect. Grow.</span>
+        )}
       </span>
     </div>
   );
