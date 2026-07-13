@@ -4,12 +4,15 @@
 
 :root {
   color-scheme: light;
-  --brand: #a30d3a;
-  --brand-hover: #8b0a31;
-  --brand-soft: #fce8ef;
-  --brand-ring: #f7c9d6;
-  --text-main: #111827;
-  --text-muted: #6b7280;
+  --brand: #b00d42;
+  --brand-hover: #8f0f3c;
+  --brand-bright: #e93765;
+  --brand-soft: #ffe0e7;
+  --brand-ring: #ffc6d3;
+  --ink: #161119;
+  --paper: #faf7f8;
+  --text-main: #1c1720;
+  --text-muted: #6b6270;
 }
 
 html, body, #root {
@@ -17,9 +20,16 @@ html, body, #root {
 }
 
 body {
-  @apply bg-slate-50 antialiased;
+  background-color: var(--paper);
   color: var(--text-main);
-  font-family: 'Poppins', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: 'Sora', 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 @layer components {
@@ -27,59 +37,88 @@ body {
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn text-white shadow-sm;
-    background-color: var(--brand);
+    @apply btn text-white;
+    background-image: linear-gradient(120deg, var(--brand-bright), var(--brand));
+    box-shadow: 0 8px 20px -8px rgba(178,13,66,0.55);
   }
   .btn-primary:hover {
-    background-color: var(--brand-hover);
+    box-shadow: 0 12px 26px -8px rgba(178,13,66,0.7);
+    transform: translateY(-1px);
   }
   .btn-outline {
-    @apply btn bg-white;
-    border: 1.5px solid var(--brand);
+    @apply btn bg-white/80 backdrop-blur;
+    border: 1.5px solid var(--brand-ring);
     color: var(--brand);
   }
   .btn-outline:hover {
     background-color: var(--brand-soft);
+    border-color: var(--brand);
   }
+  .btn-dark {
+    @apply btn text-white;
+    background-color: var(--ink);
+  }
+  .btn-dark:hover { background-color: #241e28; transform: translateY(-1px); }
   .btn-ghost {
-    @apply btn text-slate-600 hover:bg-slate-100;
+    @apply btn text-ink-600 hover:bg-ink-50;
   }
   .card {
-    @apply rounded-2xl bg-white shadow-card border border-slate-100;
+    @apply rounded-3xl bg-white shadow-card border border-ink-100/70;
   }
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap;
+    @apply inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap;
+  }
+  .chip-active {
+    background-color: var(--brand);
+    border-color: var(--brand);
+    @apply text-white;
   }
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none;
+    @apply w-full rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm outline-none transition-shadow;
   }
   .input:focus {
     border-color: var(--brand);
-    box-shadow: 0 0 0 3px var(--brand-soft);
+    box-shadow: 0 0 0 4px var(--brand-soft);
   }
   .label {
-    @apply mb-1.5 block text-sm font-medium text-slate-700;
+    @apply mb-1.5 block text-sm font-medium text-ink-700;
   }
-  .text-brand {
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em];
     color: var(--brand);
   }
-  .bg-brand {
-    background-color: var(--brand);
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold;
   }
-  .bg-brand-soft {
-    background-color: var(--brand-soft);
+  .glass {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.14);
+    backdrop-filter: blur(12px);
   }
-  .border-brand {
-    border-color: var(--brand);
-  }
+  .text-brand { color: var(--brand); }
+  .bg-brand { background-color: var(--brand); }
+  .bg-brand-soft { background-color: var(--brand-soft); }
+  .border-brand { border-color: var(--brand); }
+  .link-brand { color: var(--brand); @apply font-semibold hover:underline; }
 }
 
-::-webkit-scrollbar { height: 8px; width: 8px; }
-::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded-full; }
+.mesh {
+  background:
+    radial-gradient(60% 60% at 80% 10%, rgba(233,55,101,0.35) 0%, transparent 60%),
+    radial-gradient(50% 50% at 10% 20%, rgba(178,13,66,0.30) 0%, transparent 55%),
+    radial-gradient(60% 80% at 50% 120%, rgba(120,10,55,0.45) 0%, transparent 60%);
+}
+
+::-webkit-scrollbar { height: 9px; width: 9px; }
+::-webkit-scrollbar-thumb { @apply bg-ink-200 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-ink-300; }
 ::-webkit-scrollbar-track { background: transparent; }
 
-.animate-fade-in { animation: fadeIn .35s ease both; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity:1; transform: translateY(0);} }
+.animate-fade-in { animation: fadeIn .4s ease both; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px);} to { opacity:1; transform: translateY(0);} }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

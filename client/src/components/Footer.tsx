@@ -1,40 +1,59 @@
+import { Link } from 'react-router-dom';
 import { Logo } from './ui';
-import { Mail, MapPin, Phone } from './icons';
+import { Mail, MapPin, Phone, Instagram, Linkedin, Twitter } from './icons';
 
 export default function Footer() {
   return (
-    <footer className="mt-16 border-t border-slate-200 bg-white">
-      <div className="container-px grid gap-8 py-12 md:grid-cols-4">
+    <footer className="mt-20 bg-ink-950 text-ink-300">
+      <div className="container-px grid gap-10 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
-          <Logo />
-          <p className="mt-3 max-w-xs text-sm text-slate-500">
-            India's smart platform to discover exhibitions, book stalls in real time, and grow your business — all in one place.
+          <div className="[&_span]:!text-white"><Logo light /></div>
+          <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-400">
+            Bengaluru's smart platform to discover exhibitions, explore exhibitors and book stalls in real time — all in one place.
           </p>
+          <div className="mt-5 flex gap-2.5">
+            {[Instagram, Linkedin, Twitter].map((Icon, i) => (
+              <a key={i} href="#" className="grid h-9 w-9 place-items-center rounded-full bg-white/5 text-ink-300 transition-colors hover:bg-brand hover:text-white"><Icon /></a>
+            ))}
+          </div>
         </div>
+        <FooterCol title="Explore" items={[
+          { label: 'Live exhibitions', to: '/exhibitions?status=live' },
+          { label: 'Upcoming events', to: '/exhibitions?status=upcoming' },
+          { label: 'Past exhibitions', to: '/exhibitions?status=past' },
+          { label: 'All exhibitions', to: '/exhibitions' },
+        ]} />
+        <FooterCol title="Company" items={[
+          { label: 'About ExpoHub', to: '/' },
+          { label: 'For organizers', to: '/register' },
+          { label: 'For exhibitors', to: '/register' },
+          { label: 'Careers', to: '/' },
+        ]} />
         <div>
-          <h4 className="mb-3 text-sm font-bold text-slate-900">Explore</h4>
-          <ul className="space-y-2 text-sm text-slate-500">
-            <li>Live Exhibitions</li><li>Upcoming Events</li><li>Past Exhibitions</li><li>Floor Plans</li>
-          </ul>
-        </div>
-        <div>
-          <h4 className="mb-3 text-sm font-bold text-slate-900">Company</h4>
-          <ul className="space-y-2 text-sm text-slate-500">
-            <li>About ExpoHub</li><li>For Organizers</li><li>For Exhibitors</li><li>Careers</li>
-          </ul>
-        </div>
-        <div>
-          <h4 className="mb-3 text-sm font-bold text-slate-900">Contact</h4>
-          <ul className="space-y-2.5 text-sm text-slate-500">
-            <li className="flex items-center gap-2"><MapPin width={16} /> BIEC & venues across Bengaluru</li>
-            <li className="flex items-center gap-2"><Phone width={16} /> +91 11 4000 0000</li>
-            <li className="flex items-center gap-2"><Mail width={16} /> hello@expohub.com</li>
+          <h4 className="mb-4 text-sm font-bold text-white">Contact</h4>
+          <ul className="space-y-3 text-sm text-ink-400">
+            <li className="flex items-start gap-2.5"><MapPin width={17} className="mt-0.5 shrink-0 text-brand-400" /> BIEC & venues across Bengaluru</li>
+            <li className="flex items-center gap-2.5"><Phone width={17} className="text-brand-400" /> +91 80 4000 0000</li>
+            <li className="flex items-center gap-2.5"><Mail width={17} className="text-brand-400" /> hello@expohub.com</li>
           </ul>
         </div>
       </div>
-      <div className="border-t border-slate-100 py-5 text-center text-xs text-slate-400">
-        © {new Date().getFullYear()} ExpoHub Exhibitions Pvt. Ltd. — A demo exhibition & stall booking platform. Built with React + Turso.
+      <div className="border-t border-white/10 py-5 text-center text-xs text-ink-500">
+        © {new Date().getFullYear()} ExpoHub Exhibitions Pvt. Ltd. — demo exhibition & stall booking platform. Built with React + Turso.
       </div>
     </footer>
+  );
+}
+
+function FooterCol({ title, items }: { title: string; items: { label: string; to: string }[] }) {
+  return (
+    <div>
+      <h4 className="mb-4 text-sm font-bold text-white">{title}</h4>
+      <ul className="space-y-2.5 text-sm text-ink-400">
+        {items.map((it) => (
+          <li key={it.label}><Link to={it.to} className="transition-colors hover:text-white">{it.label}</Link></li>
+        ))}
+      </ul>
+    </div>
   );
 }

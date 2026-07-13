@@ -14,6 +14,13 @@ const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
   Hebbal: { lat: 13.0358, lng: 77.5970 },
 };
 
+const STATUS_TABS = [
+  { key: '', label: 'All' },
+  { key: 'live', label: 'Live now' },
+  { key: 'upcoming', label: 'Upcoming' },
+  { key: 'past', label: 'Past' },
+];
+
 export default function Exhibitions() {
   const [params, setParams] = useSearchParams();
   const [list, setList] = useState<(Exhibition & { distance_km?: number | null })[]>([]);
@@ -55,97 +62,83 @@ export default function Exhibitions() {
   const enableNearMe = () => {
     setLocError('');
     if (!navigator.geolocation) {
-      setCoords(CITY_COORDS.Bengaluru);
-      setLocLabel('Bengaluru (demo)');
-      setNearMe(true);
-      return;
+      setCoords(CITY_COORDS.Bengaluru); setLocLabel('Bengaluru (demo)'); setNearMe(true); return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocLabel('Your current location');
-        setNearMe(true);
-      },
-      () => {
-        setCoords(CITY_COORDS.Bengaluru);
-        setLocLabel('Bengaluru (demo fallback)');
-        setNearMe(true);
-        setLocError('Location permission denied — showing Bengaluru as demo.');
-      },
+      (pos) => { setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocLabel('your current location'); setNearMe(true); },
+      () => { setCoords(CITY_COORDS.Bengaluru); setLocLabel('Bengaluru (demo fallback)'); setNearMe(true); setLocError('Location permission denied — showing Bengaluru as demo.'); },
       { timeout: 8000 }
     );
   };
 
-  const pickCityLocation = (c: string) => {
+  const pickVenue = (c: string) => {
     if (!CITY_COORDS[c]) return;
-    setCoords(CITY_COORDS[c]);
-    setLocLabel(c === 'Bengaluru' ? 'Bengaluru' : `${c}, Bengaluru`);
-    setNearMe(true);
-    update('city', '');
+    setCoords(CITY_COORDS[c]); setLocLabel(c === 'Bengaluru' ? 'Bengaluru' : `${c}, Bengaluru`); setNearMe(true); update('city', '');
   };
 
+  const clearAll = () => { setParams(new URLSearchParams()); setNearMe(false); setCoords(null); };
+  const hasFilters = !!(status || industry || city || q || nearMe);
+
   return (
-    <div className="container-px py-8">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900">Discover Exhibitions</h1>
-          <p className="text-sm text-slate-500">All shows are in Bengaluru — browse live, upcoming and past exhibitions.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={enableNearMe} className={`btn ${nearMe ? 'btn-primary' : 'btn-outline'}`}>
-            <MapPin width={16} /> Near Me
-          </button>
-          {nearMe && (
-            <button onClick={() => { setNearMe(false); setCoords(null); }} className="btn-ghost text-sm">Clear location</button>
-          )}
-        </div>
-      </div>
+    <div>
+      <div className="border-b border-ink-100 bg-white">
+        <div className="container-px py-9">
+          <div className="eyebrow mb-2">Bengaluru · Trade fairs & expos</div>
+          <h1 className="font-display text-3xl font-extrabold text-ink-900 sm:text-4xl">Discover exhibitions</h1>
+          <p className="mt-2 max-w-xl text-ink-500">Every show happens in Bengaluru — browse live, upcoming and past exhibitions, or find the ones nearest you.</p>
 
-      {(nearMe || locError) && (
-        <div className="mb-4 rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-800">
-          {locError || `Showing exhibitions near ${locLabel}${list[0]?.distance_km != null ? ` · closest ${list[0].distance_km} km away` : ''}`}
-        </div>
-      )}
-
-      <div className="card mb-4 flex flex-wrap items-center gap-3 p-4">
-        <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-lg border border-slate-200 px-3">
-          <Search width={18} className="text-slate-400" />
-          <input defaultValue={q} onChange={(e) => update('q', e.target.value)} placeholder="Search exhibitions…" className="w-full py-2.5 text-sm outline-none" />
-        </div>
-        <select value={status} onChange={(e) => update('status', e.target.value)} className="input w-auto">
-          <option value="">All Status</option><option value="live">Live Now</option><option value="upcoming">Upcoming</option><option value="past">Past</option>
-        </select>
-        <select value={industry} onChange={(e) => update('industry', e.target.value)} className="input w-auto">
-          <option value="">All Industries</option>{filters.industries.map((i) => <option key={i} value={i}>{i}</option>)}
-        </select>
-        <select value={city} onChange={(e) => update('city', e.target.value)} className="input w-auto">
-          <option value="">All Cities</option>{filters.cities.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-
-      <div className="mb-6 flex flex-wrap gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 self-center">Bengaluru venues:</span>
-        {Object.keys(CITY_COORDS).map((c) => (
-          <button key={c} onClick={() => pickCityLocation(c)} className="chip border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700">{c}</button>
-        ))}
-      </div>
-
-      {loading ? <Spinner /> : list.length === 0 ? (
-        <div className="card grid place-items-center py-16 text-center text-slate-500"><Grid width={40} className="mb-3 text-slate-300" />No exhibitions found.</div>
-      ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {list.map((e) => (
-            <div key={e.id} className="relative">
-              {e.distance_km != null && (
-                <div className="absolute left-3 top-3 z-10 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-bold text-brand-700 shadow-sm">
-                  {e.distance_km} km
-                </div>
-              )}
-              <ExhibitionCard e={e} />
+          <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex flex-1 items-center gap-2 rounded-full border border-ink-200 bg-white px-4 shadow-sm focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-100">
+              <Search width={19} className="text-ink-400" />
+              <input defaultValue={q} onChange={(e) => update('q', e.target.value)} placeholder="Search by name, industry or venue…" className="w-full bg-transparent py-3 text-sm outline-none" />
             </div>
-          ))}
+            <div className="flex gap-2">
+              <select value={industry} onChange={(e) => update('industry', e.target.value)} className="input w-auto rounded-full">
+                <option value="">All industries</option>{filters.industries.map((i) => <option key={i} value={i}>{i}</option>)}
+              </select>
+              <button onClick={enableNearMe} className={nearMe ? 'btn-primary' : 'btn-outline'}><MapPin width={16} /> Near me</button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {STATUS_TABS.map((t) => (
+              <button key={t.key} onClick={() => update('status', t.key)}
+                className={`chip ${status === t.key ? 'chip-active' : 'border-ink-200 bg-white text-ink-600 hover:border-brand-300'}`}>{t.label}</button>
+            ))}
+            <span className="mx-1 h-4 w-px bg-ink-200" />
+            {Object.keys(CITY_COORDS).map((c) => (
+              <button key={c} onClick={() => pickVenue(c)} className="chip border-ink-200 bg-white text-ink-600 hover:border-brand-300 hover:text-brand-700">{c}</button>
+            ))}
+            {hasFilters && <button onClick={clearAll} className="ml-1 text-xs font-semibold text-brand-600 hover:underline">Clear all</button>}
+          </div>
         </div>
-      )}
+      </div>
+
+      <div className="container-px py-8">
+        {(nearMe || locError) && (
+          <div className="mb-5 rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+            {locError || `Showing exhibitions near ${locLabel}${list[0]?.distance_km != null ? ` · closest ${list[0].distance_km} km away` : ''}`}
+          </div>
+        )}
+
+        {loading ? <Spinner /> : list.length === 0 ? (
+          <div className="card grid place-items-center py-20 text-center text-ink-500"><Grid width={42} className="mb-3 text-ink-300" />No exhibitions match your filters.</div>
+        ) : (
+          <>
+            <div className="mb-4 text-sm text-ink-400">{list.length} exhibition{list.length !== 1 ? 's' : ''} found</div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {list.map((e) => (
+                <div key={e.id} className="relative">
+                  {e.distance_km != null && (
+                    <div className="absolute left-3 top-3 z-10 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-bold text-brand-700 shadow-sm">{e.distance_km} km</div>
+                  )}
+                  <ExhibitionCard e={e} />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

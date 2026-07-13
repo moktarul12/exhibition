@@ -5,9 +5,9 @@ import { Logo } from '../components/ui';
 import { Check } from '../components/icons';
 
 const DEMO = [
-  { role: 'Admin · Floor Plans', email: 'admin@expohub.com', password: 'admin123', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-  { role: 'Company · Book Stalls', email: 'exhibitor@expohub.com', password: 'demo123', color: 'bg-rose-50 text-rose-700 border-rose-200' },
-  { role: 'Visitor · Discover', email: 'visitor@expohub.com', password: 'demo123', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { role: 'Organizer / Admin', hint: 'Floor plans & analytics', email: 'admin@expohub.com', password: 'admin123' },
+  { role: 'Exhibitor / Company', hint: 'Book stalls', email: 'exhibitor@expohub.com', password: 'demo123' },
+  { role: 'Visitor / Guest', hint: 'Discover expos', email: 'visitor@expohub.com', password: 'demo123' },
 ];
 
 export default function Login() {
@@ -35,27 +35,28 @@ export default function Login() {
 
   return (
     <div className="container-px grid min-h-[calc(100vh-4rem)] place-items-center py-10">
-      <div className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-soft md:grid-cols-2">
-        <div className="hidden flex-col justify-between bg-gradient-to-br from-brand-700 to-indigo-800 p-8 text-white md:flex">
-          <Logo light />
-          <div>
-            <h2 className="text-2xl font-extrabold leading-snug">Welcome back to ExpoHub</h2>
-            <p className="mt-2 text-brand-100">Book stalls, manage exhibitions and grow your business — all from one dashboard.</p>
-            <ul className="mt-6 space-y-2 text-sm">
+      <div className="grid w-full max-w-4xl overflow-hidden rounded-4xl border border-ink-100 bg-white shadow-soft md:grid-cols-2">
+        <div className="relative hidden flex-col justify-between overflow-hidden bg-ink-950 p-9 text-white md:flex">
+          <div className="mesh absolute inset-0 opacity-80" />
+          <div className="relative"><div className="[&_span]:!text-white"><Logo light /></div></div>
+          <div className="relative">
+            <h2 className="font-display text-2xl font-extrabold leading-snug">Welcome back to ExpoHub</h2>
+            <p className="mt-2 text-ink-300">Book stalls, manage exhibitions and grow your business — all from one dashboard.</p>
+            <ul className="mt-6 space-y-2.5 text-sm">
               {['Live floor-plan stall booking', 'Manage all your bookings', 'Organizer analytics dashboard'].map((t) => (
-                <li key={t} className="flex items-center gap-2"><Check width={16} /> {t}</li>
+                <li key={t} className="flex items-center gap-2"><span className="grid h-5 w-5 place-items-center rounded-full bg-brand text-white"><Check width={13} /></span> {t}</li>
               ))}
             </ul>
           </div>
-          <div className="text-xs text-brand-200">© {new Date().getFullYear()} ExpoHub</div>
+          <div className="relative text-xs text-ink-400">© {new Date().getFullYear()} ExpoHub · Bengaluru</div>
         </div>
 
-        <div className="p-8">
-          <div className="md:hidden mb-4"><Logo /></div>
-          <h1 className="text-xl font-bold text-slate-900">Sign in to your account</h1>
-          <p className="mb-5 text-sm text-slate-500">Enter your credentials or use a demo login below.</p>
+        <div className="p-8 lg:p-10">
+          <div className="mb-4 md:hidden"><Logo /></div>
+          <h1 className="font-display text-2xl font-extrabold text-ink-900">Sign in</h1>
+          <p className="mb-6 text-sm text-ink-500">Enter your credentials or use a demo login.</p>
 
-          {error && <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+          {error && <div className="mb-4 rounded-xl bg-brand-50 px-3 py-2.5 text-sm text-brand-700">{error}</div>}
 
           <form onSubmit={submit} className="space-y-4">
             <div><label className="label">Email</label><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@company.com" /></div>
@@ -64,18 +65,18 @@ export default function Login() {
           </form>
 
           <div className="mt-6">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Quick demo logins</div>
+            <div className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-400">Quick demo logins</div>
             <div className="space-y-2">
               {DEMO.map((d) => (
-                <button key={d.email} onClick={() => quick(d)} className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm ${d.color}`}>
-                  <span className="font-semibold">{d.role}</span>
-                  <span className="text-xs opacity-80">{d.email}</span>
+                <button key={d.email} onClick={() => quick(d)} className="flex w-full items-center justify-between rounded-2xl border border-ink-100 bg-white px-3.5 py-2.5 text-left transition-colors hover:border-brand-200 hover:bg-brand-50/50">
+                  <span><span className="block text-sm font-semibold text-ink-900">{d.role}</span><span className="text-xs text-ink-400">{d.hint}</span></span>
+                  <span className="text-xs font-medium text-ink-400">{d.email}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          <p className="mt-6 text-center text-sm text-slate-500">No account? <Link to="/register" className="font-semibold text-brand-600">Create one</Link></p>
+          <p className="mt-6 text-center text-sm text-ink-500">No account? <Link to="/register" className="link-brand">Create one</Link></p>
         </div>
       </div>
     </div>

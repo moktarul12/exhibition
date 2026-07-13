@@ -3,33 +3,29 @@ import type { StallStatus } from '../types';
 
 export function Logo({ light = false }: { light?: boolean }) {
   return (
-    <div className="flex items-center gap-2">
-      <svg width="34" height="34" viewBox="0 0 40 40" fill="none" className="shrink-0">
-        <defs>
-          <linearGradient id="logoGrad" x1="6" y1="4" x2="34" y2="36" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#f59e0b" />
-            <stop offset="0.45" stopColor="#e11d48" />
-            <stop offset="1" stopColor="#a30d3a" />
-          </linearGradient>
-        </defs>
-        <path d="M20 2.5 34.7 11v18L20 37.5 5.3 29V11L20 2.5Z" fill="url(#logoGrad)" />
-        <path d="M15 13h11M15 13v14M15 20h9M15 27h11" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <span className={`text-xl font-extrabold tracking-tight ${light ? 'text-white' : 'text-slate-900'}`}>
-        ExpoHub
+    <div className="flex items-center gap-2.5">
+      <span className="relative grid h-9 w-9 place-items-center rounded-2xl shadow-lift"
+        style={{ backgroundImage: 'linear-gradient(135deg, #e93765, #b00d42 55%, #7a1238)' }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M4 20V8l8-4 8 4v12" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
+          <path d="M8 20v-6h8v6M4 12h16" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+      <span className={`font-display text-[1.35rem] font-extrabold leading-none tracking-tight ${light ? 'text-white' : 'text-ink-900'}`}>
+        Expo<span className="text-brand">Hub</span>
       </span>
     </div>
   );
 }
 
-export function StatusBadge({ status }: { status: 'live' | 'upcoming' | 'past' }) {
+export function StatusBadge({ status, size = 'md' }: { status: 'live' | 'upcoming' | 'past'; size?: 'sm' | 'md' }) {
   const map = {
-    live: { label: 'LIVE', cls: 'bg-red-500 text-white', dot: true },
-    upcoming: { label: 'UPCOMING', cls: 'bg-amber-100 text-amber-700', dot: false },
-    past: { label: 'COMPLETED', cls: 'bg-slate-200 text-slate-600', dot: false },
+    live: { label: 'Live now', cls: 'bg-brand text-white', dot: true },
+    upcoming: { label: 'Upcoming', cls: 'bg-amber-100 text-amber-800', dot: false },
+    past: { label: 'Completed', cls: 'bg-ink-100 text-ink-500', dot: false },
   }[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${map.cls}`}>
+    <span className={`pill ${map.cls} ${size === 'sm' ? 'text-[10px] px-2.5' : ''}`}>
       {map.dot && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />}
       {map.label}
     </span>
@@ -37,20 +33,20 @@ export function StatusBadge({ status }: { status: 'live' | 'upcoming' | 'past' }
 }
 
 export const stallColors: Record<StallStatus, { bg: string; border: string; text: string; label: string; legend: string }> = {
-  available: { bg: 'bg-emerald-100 hover:bg-emerald-200', border: 'border-emerald-300', text: 'text-emerald-800', label: 'Available', legend: 'bg-emerald-400' },
-  reserved: { bg: 'bg-amber-100 hover:bg-amber-200', border: 'border-amber-300', text: 'text-amber-800', label: 'Reserved', legend: 'bg-amber-400' },
-  booked: { bg: 'bg-red-100 hover:bg-red-200', border: 'border-red-300', text: 'text-red-800', label: 'Booked', legend: 'bg-red-400' },
-  sponsor: { bg: 'bg-indigo-100 hover:bg-indigo-200', border: 'border-indigo-300', text: 'text-indigo-800', label: 'Sponsor', legend: 'bg-indigo-400' },
-  blocked: { bg: 'bg-slate-200 hover:bg-slate-300', border: 'border-slate-300', text: 'text-slate-500', label: 'Blocked', legend: 'bg-slate-400' },
+  available: { bg: 'bg-emerald-50 hover:bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-800', label: 'Available', legend: 'bg-emerald-400' },
+  reserved: { bg: 'bg-amber-50 hover:bg-amber-100', border: 'border-amber-300', text: 'text-amber-800', label: 'Reserved', legend: 'bg-amber-400' },
+  booked: { bg: 'bg-brand-50 hover:bg-brand-100', border: 'border-brand-200', text: 'text-brand-700', label: 'Booked', legend: 'bg-brand-500' },
+  sponsor: { bg: 'bg-indigo-50 hover:bg-indigo-100', border: 'border-indigo-300', text: 'text-indigo-800', label: 'Sponsor', legend: 'bg-indigo-400' },
+  blocked: { bg: 'bg-ink-100 hover:bg-ink-200', border: 'border-ink-300', text: 'text-ink-400', label: 'Blocked', legend: 'bg-ink-400' },
 };
 
 export function Stat({ icon, label, value, accent }: { icon: ReactNode; label: string; value: ReactNode; accent?: string }) {
   return (
-    <div className="card flex items-center gap-3 p-4">
-      <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${accent || 'bg-brand-50 text-brand-600'}`}>{icon}</div>
+    <div className="card flex items-center gap-3.5 p-4">
+      <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${accent || 'bg-brand-50 text-brand-600'}`}>{icon}</div>
       <div className="min-w-0">
-        <div className="text-xl font-extrabold text-slate-900">{value}</div>
-        <div className="truncate text-xs font-medium text-slate-500">{label}</div>
+        <div className="font-display text-2xl font-extrabold text-ink-900">{value}</div>
+        <div className="truncate text-xs font-medium text-ink-400">{label}</div>
       </div>
     </div>
   );
@@ -58,13 +54,26 @@ export function Stat({ icon, label, value, accent }: { icon: ReactNode; label: s
 
 export function Spinner({ label }: { label?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-24 text-slate-400">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600" />
+    <div className="flex flex-col items-center justify-center gap-3 py-24 text-ink-400">
+      <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-ink-200 border-t-brand-600" />
       {label && <span className="text-sm">{label}</span>}
     </div>
   );
 }
 
 export function Tag({ children }: { children: ReactNode }) {
-  return <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11px] font-semibold text-brand-700">{children}</span>;
+  return <span className="rounded-full bg-brand-50 px-3 py-1 text-[11px] font-semibold text-brand-700">{children}</span>;
+}
+
+export function SectionHeading({ eyebrow, title, subtitle, action }: { eyebrow?: string; title: string; subtitle?: string; action?: ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        {eyebrow && <div className="eyebrow mb-2">{eyebrow}</div>}
+        <h2 className="font-display text-2xl font-extrabold text-ink-900 sm:text-3xl">{title}</h2>
+        {subtitle && <p className="mt-1.5 max-w-xl text-sm text-ink-500">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
 }

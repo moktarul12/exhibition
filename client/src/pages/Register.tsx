@@ -29,12 +29,12 @@ export default function Register() {
 
   return (
     <div className="container-px grid min-h-[calc(100vh-4rem)] place-items-center py-10">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-soft">
+      <div className="w-full max-w-md rounded-4xl border border-ink-100 bg-white p-8 shadow-soft lg:p-10">
         <Logo />
-        <h1 className="mt-5 text-xl font-bold text-slate-900">Create your account</h1>
-        <p className="mb-5 text-sm text-slate-500">Join ExpoHub in seconds.</p>
+        <h1 className="mt-6 font-display text-2xl font-extrabold text-ink-900">Create your account</h1>
+        <p className="mb-6 text-sm text-ink-500">Join ExpoHub in seconds.</p>
 
-        {error && <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+        {error && <div className="mb-4 rounded-xl bg-brand-50 px-3 py-2.5 text-sm text-brand-700">{error}</div>}
 
         <form onSubmit={submit} className="space-y-4">
           <div><label className="label">Full name</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
@@ -48,7 +48,7 @@ export default function Register() {
             <div className="grid grid-cols-3 gap-2">
               {ROLES.map((r) => (
                 <button type="button" key={r.key} onClick={() => setForm({ ...form, role: r.key })}
-                  className={`rounded-lg border p-2.5 text-center text-xs transition-colors ${form.role === r.key ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                  className={`rounded-2xl border p-3 text-center text-xs transition-colors ${form.role === r.key ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-ink-200 text-ink-600 hover:border-brand-200'}`}>
                   <div className="font-bold">{r.label}</div>
                   <div className="mt-0.5 text-[10px] leading-tight opacity-80">{r.desc}</div>
                 </button>
@@ -58,7 +58,7 @@ export default function Register() {
           <button className="btn-primary w-full" disabled={loading}>{loading ? 'Creating…' : 'Create account'}</button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-500">Already have an account? <Link to="/login" className="font-semibold text-brand-600">Sign in</Link></p>
+        <p className="mt-6 text-center text-sm text-ink-500">Already have an account? <Link to="/login" className="link-brand">Sign in</Link></p>
       </div>
     </div>
   );

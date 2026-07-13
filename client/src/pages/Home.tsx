@@ -3,14 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import type { Exhibition, Stats } from '../types';
 import ExhibitionCard from '../components/ExhibitionCard';
-import { Stat, Spinner } from '../components/ui';
-import { Search, Building, Users, Ticket, Grid, ArrowRight, Trending, Calendar, Star, ChevronDown, Phone } from '../components/icons';
+import { Spinner, SectionHeading } from '../components/ui';
+import { Search, Building, Users, Ticket, Grid, ArrowRight, Calendar, Star, MapPin, Zap, Layout, Eye, Sparkle } from '../components/icons';
 import { useAuth } from '../auth';
 
 const TABS = [
-  { key: 'live', label: 'Live Now' },
+  { key: 'live', label: 'Live now' },
   { key: 'upcoming', label: 'Upcoming' },
-  { key: 'past', label: 'Past Exhibitions' },
+  { key: 'past', label: 'Past' },
 ] as const;
 
 export default function Home() {
@@ -24,266 +24,187 @@ export default function Home() {
   const [tab, setTab] = useState<'live' | 'upcoming' | 'past'>('live');
   const [q, setQ] = useState('');
   const [industry, setIndustry] = useState('');
-  const [city, setCity] = useState('');
-  const [activeChips, setActiveChips] = useState<string[]>([]);
 
   useEffect(() => {
-    Promise.all([
-      api.get('/stats'),
-      api.get('/exhibitions'),
-      api.get('/exhibitions/meta/filters'),
-    ]).then(([s, e, f]) => {
-      setStats(s.data); setAll(e.data); setFilters(f.data);
-    }).finally(() => setLoading(false));
+    Promise.all([api.get('/stats'), api.get('/exhibitions'), api.get('/exhibitions/meta/filters')])
+      .then(([s, e, f]) => { setStats(s.data); setAll(e.data); setFilters(f.data); })
+      .finally(() => setLoading(false));
   }, []);
 
-  const chips = ['Trending', 'B2B', 'International', 'Government', 'Free Entry', 'Early Bird'];
-  const toggleChip = (c: string) => setActiveChips((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]);
-
-  const visible = useMemo(() => {
-    return all.filter((e) => {
-      if (e.status !== tab) return false;
-      if (industry && e.industry !== industry) return false;
-      if (city && e.city !== city) return false;
-      if (q && !`${e.name} ${e.industry} ${e.venue} ${e.city}`.toLowerCase().includes(q.toLowerCase())) return false;
-      for (const c of activeChips) {
-        if (c === 'Trending' && !e.tags.includes('Trending')) return false;
-        if (c === 'B2B' && !e.b2b) return false;
-        if (c === 'International' && !e.international) return false;
-        if (c === 'Government' && !e.government) return false;
-        if (c === 'Free Entry' && !e.entry_free) return false;
-        if (c === 'Early Bird' && !e.early_bird) return false;
-      }
-      return true;
-    });
-  }, [all, tab, industry, city, q, activeChips]);
-
+  const visible = useMemo(() => all.filter((e) => e.status === tab), [all, tab]);
   const featured = all.filter((e) => e.tags?.includes('Trending') || e.tags?.includes('Most Booked')).slice(0, 3);
 
   const doSearch = () => {
-    const params = new URLSearchParams();
-    if (q) params.set('q', q);
-    if (industry) params.set('industry', industry);
-    if (city) params.set('city', city);
-    navigate(`/exhibitions?${params.toString()}`);
+    const p = new URLSearchParams();
+    if (q) p.set('q', q);
+    if (industry) p.set('industry', industry);
+    navigate(`/exhibitions?${p.toString()}`);
   };
 
   if (loading) return <Spinner label="Loading exhibitions…" />;
 
   return (
-    <div className="overflow-hidden bg-white">
-      {/* Hero banner — 100% match ux.png */}
-      <section className="relative bg-white">
-        <div className="container-px relative grid items-center gap-6 pt-8 pb-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:pt-12 lg:pb-16">
-          {/* Left copy */}
-          <div className="relative z-10 max-w-[560px]">
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold"
-              style={{ backgroundColor: 'var(--brand-soft)', borderColor: 'var(--brand-ring)', color: 'var(--brand)' }}
-            >
-              <Star width={13} style={{ color: '#f59e0b', fill: '#f59e0b' }} />
-              India's #1 Stall Booking Platform
+    <div>
+      {/* ---------------- Hero ---------------- */}
+      <section className="relative overflow-hidden bg-ink-950 text-white">
+        <div className="mesh absolute inset-0 opacity-90" />
+        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+        <div className="container-px relative grid items-center gap-10 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:py-20">
+          <div className="relative z-10 max-w-xl">
+            <span className="glass inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold text-white">
+              <Star width={13} style={{ color: '#fbbf24', fill: '#fbbf24' }} /> Bengaluru's #1 stall booking platform
             </span>
-            <h1 className="mt-5 text-[2.4rem] font-extrabold leading-[1.12] tracking-tight text-slate-900 sm:text-[2.85rem] lg:text-[3.25rem]">
-              {canBook ? <>Discover. Book. Exhibit.<br /><span style={{ color: 'var(--brand)' }}>Grow Your Business.</span></> : <>Discover Exhibitions.<br /><span style={{ color: 'var(--brand)' }}>Meet Exhibitors.</span></>}
+            <h1 className="mt-5 font-display text-[2.6rem] font-extrabold leading-[1.08] sm:text-5xl lg:text-[3.5rem]">
+              {canBook ? <>Book your stall at<br />Bengaluru's best <span className="text-brand-300">expos.</span></> : <>Discover Bengaluru's<br />biggest <span className="text-brand-300">exhibitions.</span></>}
             </h1>
-            <p className="mt-4 max-w-[480px] text-[15px] leading-relaxed text-slate-500">
+            <p className="mt-5 max-w-md text-[15px] leading-relaxed text-ink-300">
               {canBook
-                ? 'Find, book and manage your perfect stall at leading trade fairs and exhibitions in Bengaluru – with live floor plans and instant booking.'
-                : 'Explore live and upcoming trade fairs in Bengaluru, browse exhibitor profiles, and plan your visit — no booking required.'}
+                ? 'Browse live floor plans, pick your exact stall and book instantly at leading trade fairs across Bengaluru.'
+                : 'Explore live and upcoming trade fairs across Bengaluru, meet exhibitors, watch venue reels and plan your visit.'}
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link to="/exhibitions?status=live" className="btn-primary h-11 px-6 text-[15px]">
-                {canBook ? <>Book a Stall <ArrowRight width={18} /></> : <>Discover Live Expos <ArrowRight width={18} /></>}
-              </Link>
-              <Link to="/exhibitions" className="btn-outline h-11 px-6 text-[15px]">
-                Explore Exhibitions
-              </Link>
-            </div>
-          </div>
 
-          {/* Right visual — real exhibition / stall composition */}
-          <div className="relative mx-auto w-full max-w-[560px] lg:max-w-none lg:justify-self-end">
-            {/* Soft pink circles + dots (design backdrop) */}
-            <div className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-[115%] w-[115%] -translate-x-1/2 -translate-y-1/2">
-              <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, rgba(252,232,239,0.9) 0%, rgba(252,232,239,0.25) 48%, transparent 72%)' }} />
-              <div className="absolute inset-[12%] rounded-full border-[36px]" style={{ borderColor: 'rgba(247,201,214,0.5)' }} />
-              <div className="absolute inset-[28%] rounded-full border-[28px]" style={{ borderColor: 'rgba(247,201,214,0.35)' }} />
-            </div>
-            <div
-              className="pointer-events-none absolute right-2 top-2 z-0 h-28 w-28 opacity-35"
-              style={{ backgroundImage: 'radial-gradient(#9ca3af 1.3px, transparent 1.3px)', backgroundSize: '10px 10px' }}
-            />
-
-            {/* Main: busy exhibition hall */}
-            <div className="relative z-10 overflow-hidden rounded-3xl shadow-soft ring-1 ring-black/5">
-              <img
-                src="/hero-expo-hall.png"
-                alt="Live exhibition hall with stalls"
-                className="h-[300px] w-full object-cover sm:h-[340px] lg:h-[380px]"
-              />
-              <div className="absolute inset-0 bg-gradient-to-tr from-[#a30d3a]/25 via-transparent to-transparent" />
-              <div className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[#a30d3a] shadow-sm">
-                Live Exhibition
+            {/* Search */}
+            <div className="mt-7 flex flex-col gap-2 rounded-2xl bg-white p-2 shadow-soft sm:flex-row sm:items-center">
+              <div className="flex flex-1 items-center gap-2 px-3">
+                <Search width={18} className="shrink-0 text-ink-400" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+                  placeholder="Search exhibitions, industry, venue…" className="w-full bg-transparent py-2.5 text-sm text-ink-800 outline-none placeholder:text-ink-400" />
               </div>
-            </div>
-
-            {/* Floating: real stall booth photo */}
-            <div className="absolute -bottom-2 left-3 z-20 w-[46%] overflow-hidden rounded-2xl border-4 border-white shadow-soft sm:left-4 sm:w-[42%]">
-              <img
-                src="/hero-stall-booth.png"
-                alt="Premium exhibition stall"
-                className="h-28 w-full object-cover sm:h-32"
-              />
-              <div className="bg-white px-2.5 py-1.5">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-[#a30d3a]">Premium Stall</div>
-                <div className="text-xs font-bold text-slate-800">Book your spot</div>
-              </div>
-            </div>
-
-            {/* Need Help card */}
-            <div className="absolute -bottom-1 right-2 z-20 flex items-center gap-2.5 rounded-xl border border-slate-100 bg-white px-3 py-2.5 shadow-soft sm:right-3">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ backgroundColor: 'var(--brand-soft)', color: 'var(--brand)' }}>
-                <Phone width={16} />
-              </div>
-              <div className="leading-tight">
-                <div className="text-[11px] font-bold text-slate-900">Need Help?</div>
-                <div className="text-[11px] text-slate-500">Talk to our expert</div>
-                <div className="text-sm font-bold" style={{ color: 'var(--brand)' }}>+91 98765 43210</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Floating search bar */}
-        <div className="container-px relative z-20 -mb-5">
-          <div className="flex flex-col gap-2 rounded-2xl border border-slate-100 bg-white p-2 shadow-soft sm:flex-row sm:items-center sm:gap-0 sm:p-1.5 sm:pl-4">
-            <div className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 sm:py-0">
-              <Search width={18} className="shrink-0 text-slate-400" />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && doSearch()}
-                placeholder="Search exhibitions, industry, venue..."
-                className="w-full bg-transparent py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
-              />
-            </div>
-            <div className="hidden h-8 w-px bg-slate-200 sm:block" />
-            <div className="relative px-2">
-              <select
-                value={industry}
-                onChange={(e) => setIndustry(e.target.value)}
-                className="w-full appearance-none bg-transparent py-2.5 pr-7 text-sm font-medium text-slate-700 outline-none sm:w-40"
-              >
-                <option value="">All Industries</option>
+              <select value={industry} onChange={(e) => setIndustry(e.target.value)} className="rounded-xl bg-ink-50 px-3 py-2.5 text-sm font-medium text-ink-700 outline-none sm:w-40">
+                <option value="">All industries</option>
                 {filters.industries.map((i) => <option key={i} value={i}>{i}</option>)}
               </select>
-              <ChevronDown width={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <button onClick={doSearch} className="btn-primary shrink-0">Search</button>
             </div>
-            <div className="hidden h-8 w-px bg-slate-200 sm:block" />
-            <div className="relative px-2">
-              <select
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full appearance-none bg-transparent py-2.5 pr-7 text-sm font-medium text-slate-700 outline-none sm:w-36"
-              >
-                <option value="">All Cities</option>
-                {filters.cities.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <ChevronDown width={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+
+            <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-300">
+              {stats && <><b className="text-white">{stats.live}</b> live now</>}
+              {stats && <span className="flex items-center gap-1.5"><b className="text-white">{stats.companies}</b> exhibitors</span>}
+              {stats && <span className="flex items-center gap-1.5"><b className="text-white">{(stats.visitors / 1000).toFixed(0)}K+</b> visitors</span>}
             </div>
-            <button onClick={doSearch} className="btn-primary h-11 shrink-0 px-6 sm:ml-1">
-              <Search width={16} /> Search
-            </button>
+          </div>
+
+          {/* Visual */}
+          <div className="relative z-10 hidden lg:block">
+            <div className="relative mx-auto max-w-md">
+              <div className="overflow-hidden rounded-4xl border border-white/10 shadow-2xl">
+                <img src="/hero-expo-hall.png" alt="Exhibition hall in Bengaluru" className="h-[400px] w-full object-cover" />
+              </div>
+              <div className="absolute -left-6 top-10 w-44 animate-floaty overflow-hidden rounded-2xl border-4 border-white/90 shadow-2xl">
+                <img src="/hero-stall-booth.png" alt="Premium stall" className="h-28 w-full object-cover" />
+                <div className="bg-white px-3 py-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-brand-600">Premium stall</div>
+                  <div className="text-xs font-bold text-ink-900">From ₹45,000</div>
+                </div>
+              </div>
+              <div className="absolute -right-4 bottom-8 glass rounded-2xl px-4 py-3 text-white">
+                <div className="flex items-center gap-2 text-xs font-semibold"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" /> Live availability</div>
+                <div className="mt-1 font-display text-2xl font-extrabold">1,804 stalls</div>
+                <div className="text-[11px] text-ink-300">across all Bengaluru halls</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="container-px mt-12 relative z-10">
-        {/* Quick stats */}
-        {stats && (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-            <Stat icon={<Ticket width={20} />} label="Live Exhibitions" value={stats.live} accent="bg-red-50 text-red-600" />
-            <Stat icon={<Calendar width={20} />} label="Upcoming" value={stats.upcoming} accent="bg-amber-50 text-amber-600" />
-            <Stat icon={<Building width={20} />} label="Companies" value={stats.companies} />
-            <Stat icon={<Users width={20} />} label="Organizers" value={stats.organizers} accent="bg-indigo-50 text-indigo-600" />
-            <Stat icon={<Users width={20} />} label="Total Visitors" value={`${(stats.visitors / 1000).toFixed(0)}K+`} accent="bg-emerald-50 text-emerald-600" />
-            <Stat icon={<Grid width={20} />} label="Bookings" value={stats.bookings} accent="bg-purple-50 text-purple-600" />
+      {/* ---------------- Stats band ---------------- */}
+      {stats && (
+        <section className="container-px -mt-10 relative z-20">
+          <div className="grid grid-cols-2 gap-3 rounded-3xl border border-ink-100 bg-white p-4 shadow-soft md:grid-cols-3 lg:grid-cols-6">
+            <MiniStat icon={<Ticket width={18} />} value={stats.live} label="Live expos" accent="bg-brand-50 text-brand-600" />
+            <MiniStat icon={<Calendar width={18} />} value={stats.upcoming} label="Upcoming" accent="bg-amber-50 text-amber-600" />
+            <MiniStat icon={<Building width={18} />} value={stats.companies} label="Exhibitors" accent="bg-indigo-50 text-indigo-600" />
+            <MiniStat icon={<Users width={18} />} value={stats.organizers} label="Organizers" accent="bg-sky-50 text-sky-600" />
+            <MiniStat icon={<Users width={18} />} value={`${(stats.visitors / 1000).toFixed(0)}K+`} label="Visitors" accent="bg-emerald-50 text-emerald-600" />
+            <MiniStat icon={<Grid width={18} />} value={stats.bookings} label="Bookings" accent="bg-purple-50 text-purple-600" />
           </div>
-        )}
-      </div>
+        </section>
+      )}
 
-      {/* Featured */}
+      {/* ---------------- Featured ---------------- */}
       {featured.length > 0 && (
-        <section className="container-px mt-12">
-          <div className="mb-4 flex items-center gap-2">
-            <Trending width={20} className="text-brand-600" />
-            <h2 className="text-xl font-bold text-slate-900">Featured & Trending</h2>
-          </div>
+        <section className="container-px mt-16">
+          <SectionHeading eyebrow="Handpicked" title="Featured & trending" subtitle="The most talked-about exhibitions happening in Bengaluru right now."
+            action={<Link to="/exhibitions" className="btn-outline">View all <ArrowRight width={16} /></Link>} />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {featured.map((e) => <ExhibitionCard key={e.id} e={e} />)}
           </div>
         </section>
       )}
 
-      {/* Tabs + Filters */}
-      <section className="container-px mt-12">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
-            {TABS.map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${tab === t.key ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <div className="text-sm text-slate-500">{visible.length} exhibition{visible.length !== 1 && 's'}</div>
-        </div>
-
-        <div className="mb-6 flex flex-wrap gap-2">
-          {chips.map((c) => (
-            <button key={c} onClick={() => toggleChip(c)}
-              className={`chip ${activeChips.includes(c) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-              {c}
-            </button>
-          ))}
-          {(activeChips.length > 0 || industry || city || q) && (
-            <button onClick={() => { setActiveChips([]); setIndustry(''); setCity(''); setQ(''); }} className="chip border-transparent text-slate-400 hover:text-slate-600">Clear all</button>
-          )}
-        </div>
-
+      {/* ---------------- Browse by status ---------------- */}
+      <section className="container-px mt-16">
+        <SectionHeading eyebrow="What's on" title="Browse exhibitions"
+          action={
+            <div className="inline-flex rounded-full border border-ink-200 bg-white p-1">
+              {TABS.map((t) => (
+                <button key={t.key} onClick={() => setTab(t.key)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${tab === t.key ? 'bg-brand text-white' : 'text-ink-600 hover:bg-ink-50'}`}>{t.label}</button>
+              ))}
+            </div>
+          } />
         {visible.length === 0 ? (
-          <div className="card grid place-items-center py-16 text-center text-slate-500">
-            <Grid width={40} className="mb-3 text-slate-300" />
-            No exhibitions match your filters.
-          </div>
+          <div className="card grid place-items-center py-16 text-center text-ink-500"><Grid width={40} className="mb-3 text-ink-300" />No {tab} exhibitions right now.</div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {visible.map((e) => <ExhibitionCard key={e.id} e={e} />)}
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {visible.slice(0, 8).map((e) => <ExhibitionCard key={e.id} e={e} />)}
           </div>
         )}
+        <div className="mt-8 text-center">
+          <Link to={`/exhibitions?status=${tab}`} className="btn-outline">See all {tab} exhibitions <ArrowRight width={16} /></Link>
+        </div>
       </section>
 
-      {/* Unique features */}
-      <section className="container-px mt-16">
-        <div className="rounded-3xl bg-slate-900 p-8 text-white lg:p-12">
-          <h2 className="text-2xl font-bold">Why exhibitors love ExpoHub</h2>
-          <p className="mt-2 max-w-xl text-slate-300">A powerful, BookMyShow-style experience for exhibitions — with real-time stall booking built in.</p>
-          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { t: 'Live Stall Availability', d: 'Stall colors update instantly as bookings happen.' },
-              { t: 'Interactive Floor Plans', d: 'Pick your exact stall visually, hall by hall.' },
-              { t: 'Compare Exhibitions', d: 'Visitors, exhibitors, industries & pricing side by side.' },
-              { t: 'Watch & Get Notified', d: 'Be alerted the moment bookings open.' },
-            ].map((f) => (
-              <div key={f.t} className="rounded-2xl bg-white/5 p-5">
-                <div className="text-base font-bold">{f.t}</div>
-                <div className="mt-1.5 text-sm text-slate-300">{f.d}</div>
-              </div>
-            ))}
+      {/* ---------------- Features ---------------- */}
+      <section className="container-px mt-20">
+        <div className="relative overflow-hidden rounded-4xl bg-ink-950 p-8 text-white lg:p-14">
+          <div className="mesh absolute inset-0 opacity-70" />
+          <div className="relative">
+            <div className="eyebrow mb-3 text-brand-300">Why ExpoHub</div>
+            <h2 className="max-w-2xl font-display text-3xl font-extrabold lg:text-4xl">A BookMyShow-style experience for exhibitions</h2>
+            <p className="mt-3 max-w-xl text-ink-300">Everything you need to discover expos and book stalls in real time — all in Bengaluru.</p>
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { icon: <Zap width={22} />, t: 'Live availability', d: 'Stall colours update instantly as bookings happen.' },
+                { icon: <Layout width={22} />, t: 'Interactive floor plans', d: 'Pick your exact stall visually, hall by hall.' },
+                { icon: <Eye width={22} />, t: 'Venue reels & maps', d: 'Watch YouTube reels and see the venue on Google Maps.' },
+                { icon: <Sparkle width={22} />, t: 'Instant booking', d: 'Confirm your stall in seconds with instant confirmation.' },
+              ].map((f) => (
+                <div key={f.t} className="glass rounded-3xl p-6">
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-brand text-white">{f.icon}</div>
+                  <div className="mt-4 font-display text-lg font-bold">{f.t}</div>
+                  <div className="mt-1.5 text-sm text-ink-300">{f.d}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
+
+      {/* ---------------- CTA ---------------- */}
+      <section className="container-px mt-16">
+        <div className="flex flex-col items-center gap-5 rounded-4xl border border-brand-100 bg-brand-50 p-10 text-center">
+          <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-brand-600 shadow-sm"><MapPin width={26} /></div>
+          <h2 className="font-display text-2xl font-extrabold text-ink-900 sm:text-3xl">Ready to exhibit in Bengaluru?</h2>
+          <p className="max-w-lg text-ink-500">Create a free account, explore live floor plans and secure your stall at the city's leading trade fairs.</p>
+          <div className="flex flex-wrap justify-center gap-3">
+            {!user && <Link to="/register" className="btn-primary">Create free account</Link>}
+            <Link to="/exhibitions" className="btn-dark">Browse exhibitions <ArrowRight width={16} /></Link>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MiniStat({ icon, value, label, accent }: { icon: React.ReactNode; value: React.ReactNode; label: string; accent: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl p-2.5">
+      <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${accent}`}>{icon}</div>
+      <div className="min-w-0">
+        <div className="font-display text-xl font-extrabold text-ink-900">{value}</div>
+        <div className="truncate text-[11px] font-medium text-ink-400">{label}</div>
+      </div>
     </div>
   );
 }
