@@ -26,7 +26,7 @@ export default function Footer() {
         <div>
           <h4 className="mb-3 text-sm font-bold text-slate-900">Contact</h4>
           <ul className="space-y-2.5 text-sm text-slate-500">
-            <li className="flex items-center gap-2"><MapPin width={16} /> Pragati Maidan, New Delhi</li>
+            <li className="flex items-center gap-2"><MapPin width={16} /> BIEC & venues across Bengaluru</li>
             <li className="flex items-center gap-2"><Phone width={16} /> +91 11 4000 0000</li>
             <li className="flex items-center gap-2"><Mail width={16} /> hello@expohub.com</li>
           </ul>

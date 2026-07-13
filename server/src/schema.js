@@ -71,6 +71,8 @@ export const SCHEMA_STATEMENTS = [
     early_bird INTEGER DEFAULT 0,
     tags TEXT, -- JSON array of chips (Trending, New Launch, etc.)
     gallery TEXT, -- JSON array of image urls
+    youtube_url TEXT,
+    address TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (organizer_id) REFERENCES organizers(id)
   )`,

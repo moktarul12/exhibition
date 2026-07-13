@@ -89,8 +89,8 @@ export default function Home() {
             </h1>
             <p className="mt-4 max-w-[480px] text-[15px] leading-relaxed text-slate-500">
               {canBook
-                ? 'Find, book and manage your perfect stall at leading trade fairs and exhibitions across India – with live floor plans and instant booking.'
-                : 'Explore live and upcoming trade fairs across India, browse exhibitor profiles, and plan your visit — no booking required.'}
+                ? 'Find, book and manage your perfect stall at leading trade fairs and exhibitions in Bengaluru – with live floor plans and instant booking.'
+                : 'Explore live and upcoming trade fairs in Bengaluru, browse exhibitor profiles, and plan your visit — no booking required.'}
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link to="/exhibitions?status=live" className="btn-primary h-11 px-6 text-[15px]">

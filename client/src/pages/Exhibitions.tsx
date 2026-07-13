@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Exhibition } from '../types';
 import ExhibitionCard from '../components/ExhibitionCard';
@@ -7,20 +7,11 @@ import { Spinner } from '../components/ui';
 import { Search, Grid, MapPin } from '../components/icons';
 
 const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  'New Delhi': { lat: 28.6139, lng: 77.2090 },
-  Mumbai: { lat: 19.0760, lng: 72.8777 },
   Bengaluru: { lat: 12.9716, lng: 77.5946 },
-  Chennai: { lat: 13.0827, lng: 80.2707 },
-  Hyderabad: { lat: 17.3850, lng: 78.4867 },
-  Ahmedabad: { lat: 23.0225, lng: 72.5714 },
-  Surat: { lat: 21.1702, lng: 72.8311 },
-  Pune: { lat: 18.5204, lng: 73.8567 },
-  Kolkata: { lat: 22.5726, lng: 88.3639 },
-  Jaipur: { lat: 26.9124, lng: 75.7873 },
-  Indore: { lat: 22.7196, lng: 75.8577 },
-  Chandigarh: { lat: 30.7333, lng: 76.7794 },
-  Goa: { lat: 15.2993, lng: 74.1240 },
-  Lucknow: { lat: 26.8467, lng: 80.9462 },
+  BIEC: { lat: 13.0716, lng: 77.4784 },
+  Whitefield: { lat: 12.9698, lng: 77.7500 },
+  'Palace Grounds': { lat: 12.9981, lng: 77.5920 },
+  Hebbal: { lat: 13.0358, lng: 77.5970 },
 };
 
 export default function Exhibitions() {
@@ -50,7 +41,7 @@ export default function Exhibitions() {
     if (nearMe && coords) {
       query.set('lat', String(coords.lat));
       query.set('lng', String(coords.lng));
-      query.set('radius_km', '800');
+      query.set('radius_km', '50');
     }
     api.get(`/exhibitions?${query.toString()}`).then((r) => setList(r.data)).finally(() => setLoading(false));
   }, [status, industry, city, q, nearMe, coords]);
@@ -64,9 +55,8 @@ export default function Exhibitions() {
   const enableNearMe = () => {
     setLocError('');
     if (!navigator.geolocation) {
-      // Fallback: use a demo city so the feature always works in demos
-      setCoords(CITY_COORDS['New Delhi']);
-      setLocLabel('New Delhi (demo)');
+      setCoords(CITY_COORDS.Bengaluru);
+      setLocLabel('Bengaluru (demo)');
       setNearMe(true);
       return;
     }
@@ -77,10 +67,10 @@ export default function Exhibitions() {
         setNearMe(true);
       },
       () => {
-        setCoords(CITY_COORDS['New Delhi']);
-        setLocLabel('New Delhi (demo fallback)');
+        setCoords(CITY_COORDS.Bengaluru);
+        setLocLabel('Bengaluru (demo fallback)');
         setNearMe(true);
-        setLocError('Location permission denied — showing New Delhi area as demo.');
+        setLocError('Location permission denied — showing Bengaluru as demo.');
       },
       { timeout: 8000 }
     );
@@ -89,7 +79,7 @@ export default function Exhibitions() {
   const pickCityLocation = (c: string) => {
     if (!CITY_COORDS[c]) return;
     setCoords(CITY_COORDS[c]);
-    setLocLabel(c);
+    setLocLabel(c === 'Bengaluru' ? 'Bengaluru' : `${c}, Bengaluru`);
     setNearMe(true);
     update('city', '');
   };
@@ -99,7 +89,7 @@ export default function Exhibitions() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900">Discover Exhibitions</h1>
-          <p className="text-sm text-slate-500">Browse live, upcoming and past exhibitions — filter by city or find shows near you.</p>
+          <p className="text-sm text-slate-500">All shows are in Bengaluru — browse live, upcoming and past exhibitions.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={enableNearMe} className={`btn ${nearMe ? 'btn-primary' : 'btn-outline'}`}>
@@ -134,8 +124,8 @@ export default function Exhibitions() {
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 self-center">Quick city:</span>
-        {Object.keys(CITY_COORDS).slice(0, 8).map((c) => (
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 self-center">Bengaluru venues:</span>
+        {Object.keys(CITY_COORDS).map((c) => (
           <button key={c} onClick={() => pickCityLocation(c)} className="chip border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700">{c}</button>
         ))}
       </div>

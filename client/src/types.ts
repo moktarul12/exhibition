@@ -35,6 +35,8 @@ export interface Exhibition {
   early_bird: number;
   tags: string[];
   gallery: string[];
+  youtube_url?: string;
+  address?: string;
   total_stalls?: number;
   available_stalls?: number;
   booked_stalls?: number;
