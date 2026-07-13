@@ -7,13 +7,14 @@ import {
   Search, MapPin, Calendar, Users, Building, Ticket, Grid, ArrowRight, ChevronRight,
   Eye, Trending, Shield, Headset, Zap, Layout, Cog, Chip, Cup, Heart, Crane, Car, Bookmark,
 } from '../components/icons';
+import { useAuth } from '../auth';
 import { useCity } from '../city';
 
 const HERO_STATS = [
-  { icon: Ticket, value: '1,200+', label: 'Exhibitions' },
-  { icon: Users, value: '25K+', label: 'Exhibitors' },
-  { icon: Eye, value: '2M+', label: 'Visitors' },
-  { icon: Building, value: '500+', label: 'Venues' },
+  { icon: Ticket, value: '1,200+', label: 'Exhibitions', bg: 'bg-brand-50 text-brand-600' },
+  { icon: Users, value: '25K+', label: 'Exhibitors', bg: 'bg-grape-100 text-grape-600' },
+  { icon: Eye, value: '2M+', label: 'Visitors', bg: 'bg-emerald-50 text-emerald-600' },
+  { icon: Building, value: '500+', label: 'Venues', bg: 'bg-sky-50 text-sky-600' },
 ];
 
 const TRUST = [
@@ -50,6 +51,9 @@ const POPULAR = [
   { label: 'Pune', city: 'Pune' },
 ];
 
+// Smooth S-curve on the left edge of the hero image panel (matches ux.png)
+const HERO_PANEL_CLIP = 'path("M 0.18 0 C 0.04 0.22 0.04 0.48 0.14 0.5 C 0.04 0.52 0.04 0.78 0.18 1 L 1 1 L 1 0 Z")';
+
 const BADGE_STYLES: Record<string, string> = {
   Featured: 'bg-brand-600 text-white',
   Trending: 'bg-emerald-500 text-white',
@@ -63,7 +67,9 @@ const BADGE_STYLES: Record<string, string> = {
 
 export default function Home() {
   const navigate = useNavigate();
-  const { setCity } = useCity();
+  const { user } = useAuth();
+  const { city, setCity } = useCity();
+  const canBook = user?.role === 'exhibitor' || user?.role === 'admin';
   const [, setStats] = useState<Stats | null>(null);
   const [all, setAll] = useState<Exhibition[]>([]);
   const [filters, setFilters] = useState<{ industries: string[]; cities: string[] }>({ industries: [], cities: [] });
@@ -87,6 +93,13 @@ export default function Home() {
     return (flagged.length >= 4 ? flagged : all).slice(0, 8);
   }, [all]);
 
+  const inCity = useMemo(() => all.filter((e) => e.city === city), [all, city]);
+  const cityStats = useMemo(() => ({
+    live: inCity.filter((e) => e.status === 'live').length,
+    upcoming: inCity.filter((e) => e.status === 'upcoming').length,
+    stalls: inCity.reduce((n, e) => n + (e.total_stalls ?? 0), 0),
+  }), [inCity]);
+
   const doSearch = () => {
     const p = new URLSearchParams();
     if (q) p.set('q', q);
@@ -100,45 +113,72 @@ export default function Home() {
   return (
     <div className="overflow-x-hidden">
       {/* ---------------- Hero ---------------- */}
-      <section className="relative">
-        <div className="absolute inset-0 -z-10" style={{ background: 'linear-gradient(180deg,#fdf2f8 0%, #f5f3ff 45%, #ffffff 100%)' }} />
-        <div className="container-px grid items-center gap-10 pb-6 pt-12 lg:grid-cols-2 lg:pt-16">
+      <section className="relative overflow-hidden">
+        {/* Soft pink hero background */}
+        <div className="absolute inset-0 -z-20" style={{ background: 'linear-gradient(180deg,#fdf2f8 0%, #f5f3ff 55%, #ffffff 100%)' }} />
+
+        {/* Full-bleed image panel — desktop (right side with S-curve) */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 -z-10 hidden w-[54%] lg:block">
+          <HeroImagePanel />
+        </div>
+
+        <div className="container-px relative z-10 grid items-center gap-10 pb-16 pt-10 lg:grid-cols-2 lg:gap-8 lg:pb-24 lg:pt-14">
+          {/* Left — city-aware copy + inline search (like attached screenshot) */}
           <div className="max-w-xl">
-            <div className="eyebrow mb-4">India's Smart Exhibition Booking Platform</div>
-            <h1 className="font-display text-[2.6rem] font-extrabold leading-[1.08] text-ink-900 sm:text-5xl lg:text-[3.4rem]">
-              The right exhibition.<br />The right audience.<br /><span className="text-grad">Real business growth.</span>
+            <h1 className="font-display text-[2.45rem] font-extrabold leading-[1.1] text-ink-900 sm:text-5xl lg:text-[3.2rem]">
+              {canBook ? (
+                <>Book your stall at the best <span className="text-grad">expos</span> in {city}.</>
+              ) : (
+                <>Discover the biggest <span className="text-grad">exhibitions</span> in {city}.</>
+              )}
             </h1>
-            <p className="mt-5 max-w-md text-lg leading-relaxed text-ink-500">
-              Discover top exhibitions, compare venues, explore floor plans and book your stall in just a few clicks.
+            <p className="mt-5 max-w-md text-base leading-relaxed text-ink-500 sm:text-[17px]">
+              {canBook
+                ? `Browse live floor plans, pick your exact stall and book instantly at leading trade fairs in ${city}.`
+                : `Explore live and upcoming trade fairs in ${city}, meet exhibitors, watch venue reels and plan your visit.`}
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+
+            {/* Inline search */}
+            <div className="mt-7 flex flex-col gap-2 rounded-2xl border border-ink-100 bg-white p-2 shadow-soft sm:flex-row sm:items-center">
+              <div className="flex flex-1 items-center gap-2 px-3">
+                <Search width={18} className="shrink-0 text-ink-400" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+                  placeholder={`Search expos in ${city}…`} className="w-full bg-transparent py-2.5 text-sm text-ink-800 outline-none placeholder:text-ink-400" />
+              </div>
+              <select value={industry} onChange={(e) => setIndustry(e.target.value)} className="rounded-xl bg-ink-50 px-3 py-2.5 text-sm font-medium text-ink-700 outline-none sm:w-40">
+                <option value="">All industries</option>
+                {filters.industries.map((i) => <option key={i} value={i}>{i}</option>)}
+              </select>
+              <button onClick={doSearch} className="btn-primary shrink-0">Search</button>
+            </div>
+
+            {/* Live city stats */}
+            <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-500">
+              <span className="flex items-center gap-1.5"><span className="h-2 w-2 animate-pulse rounded-full bg-brand" /><b className="text-ink-900">{cityStats.live}</b> live in {city}</span>
+              <span><b className="text-ink-900">{cityStats.upcoming}</b> upcoming</span>
+              <span><b className="text-ink-900">{cityStats.stalls.toLocaleString('en-IN')}</b> stalls</span>
+            </div>
+
+            <div className="mt-7 flex flex-wrap gap-3">
               <Link to="/exhibitions" className="btn-primary px-6 py-3 text-[15px]">Explore Exhibitions <ArrowRight width={17} /></Link>
               <Link to="/register" className="btn-outline px-6 py-3 text-[15px]"><Ticket width={17} /> List Your Event</Link>
             </div>
           </div>
 
-          <div className="relative">
-            <div className="absolute -right-4 -top-6 -z-10 h-48 w-48 rounded-full bg-grape-400/30 blur-3xl" />
-            <div className="absolute -bottom-8 -left-6 -z-10 h-40 w-40 rounded-full bg-brand-300/40 blur-3xl" />
-            <img src="/hero-expo-hall.png" alt="Exhibition hall" className="aspect-[4/3] w-full rounded-[2rem] object-cover shadow-soft ring-1 ring-black/5" />
-
-            {/* stats — overlay on desktop, stacked on mobile */}
-            <div className="mt-4 grid grid-cols-2 gap-3 rounded-2xl border border-ink-100 bg-white p-4 shadow-soft sm:grid-cols-4 lg:absolute lg:-bottom-12 lg:left-1/2 lg:mt-0 lg:w-[92%] lg:-translate-x-1/2">
-              {HERO_STATS.map((s) => (
-                <div key={s.label} className="flex items-center gap-2.5">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600"><s.icon width={19} /></span>
-                  <div>
-                    <div className="font-display text-lg font-extrabold text-ink-900">{s.value}</div>
-                    <div className="text-[11px] font-medium text-ink-400">{s.label}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          {/* Mobile image panel */}
+          <div className="lg:hidden">
+            <HeroImagePanel mobile />
           </div>
         </div>
 
-        {/* ---------------- Search card ---------------- */}
-        <div className="container-px mt-8 lg:mt-24">
+        {/* Bottom curve — soft arc into white (ux.png section transition) */}
+        <svg className="pointer-events-none absolute bottom-0 left-0 -z-10 w-full text-white" viewBox="0 0 1440 90" preserveAspectRatio="none" aria-hidden>
+          <path fill="currentColor" d="M0,52 C360,92 720,28 1080,52 C1260,64 1380,72 1440,68 L1440,90 L0,90 Z" />
+        </svg>
+      </section>
+
+      {/* ---------------- Search card (ux floating bar) ---------------- */}
+      <div className="container-px relative z-20 -mt-6 lg:-mt-10">
           <div className="rounded-3xl border border-ink-100 bg-white p-5 shadow-soft">
             <div className="mb-3 text-sm font-semibold text-ink-700">Search exhibitions, industry or keyword</div>
             <div className="grid gap-3 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
@@ -170,10 +210,9 @@ export default function Home() {
             </div>
           </div>
         </div>
-      </section>
 
       {/* ---------------- Trust band ---------------- */}
-      <section className="container-px mt-10">
+      <section className="container-px mt-14">
         <div className="grid gap-6 rounded-3xl px-6 py-8 text-white sm:grid-cols-2 lg:grid-cols-5 lg:gap-2"
           style={{ backgroundImage: 'linear-gradient(120deg,#171436 0%,#241a4d 55%,#3a1c56 100%)' }}>
           {TRUST.map((t, i) => (
@@ -260,6 +299,55 @@ export default function Home() {
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function HeroImagePanel({ mobile = false }: { mobile?: boolean }) {
+  const clip = mobile ? undefined : HERO_PANEL_CLIP;
+
+  return (
+    <div className={`relative ${mobile ? 'mx-auto max-w-lg' : 'h-full min-h-[520px]'}`}>
+      {/* Navy / indigo backdrop behind image */}
+      <div
+        className={`absolute inset-0 ${mobile ? 'rounded-[1.75rem]' : ''}`}
+        style={{
+          clipPath: clip,
+          background: 'linear-gradient(145deg, #141230 0%, #1e1b4b 45%, #312e81 100%)',
+        }}
+      />
+
+      {/* Soft cyan glow at the S-curve junction */}
+      {!mobile && (
+        <div className="pointer-events-none absolute -left-8 top-[38%] h-52 w-52 rounded-full bg-cyan-400/25 blur-3xl" />
+      )}
+
+      {/* Exhibition hall photo */}
+      <div className={`absolute inset-0 overflow-hidden ${mobile ? 'rounded-[1.75rem] shadow-soft' : ''}`} style={{ clipPath: clip }}>
+        <img
+          src="/hero-expo-hall.png"
+          alt="Exhibition hall"
+          className={`h-full w-full object-cover object-center ${mobile ? 'aspect-[4/3]' : 'min-h-[520px]'}`}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink-950/30 via-transparent to-transparent" />
+      </div>
+
+      {/* Stats bar — sits on image bottom edge */}
+      <div
+        className={`absolute z-10 grid grid-cols-2 gap-3 rounded-2xl border border-white/60 bg-white/95 p-4 shadow-soft backdrop-blur-sm sm:grid-cols-4 ${mobile ? '-bottom-8 left-2 right-2' : 'bottom-8 left-6 right-6 lg:left-10 lg:right-10'}`}
+      >
+        {HERO_STATS.map((s) => (
+          <div key={s.label} className="flex items-center gap-2.5">
+            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${s.bg}`}><s.icon width={19} /></span>
+            <div className="min-w-0">
+              <div className="font-display text-base font-extrabold text-ink-900 sm:text-lg">{s.value}</div>
+              <div className="truncate text-[10px] font-medium text-ink-400 sm:text-[11px]">{s.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {mobile && <div className="h-12" />}
     </div>
   );
 }
