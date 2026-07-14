@@ -10,7 +10,7 @@ import Register from './pages/Register';
 import MyBookings from './pages/MyBookings';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminFloorPlan from './pages/AdminFloorPlan';
-import AdminCreateEvent from './pages/AdminCreateEvent';
+import AdminEventForm from './pages/AdminEventForm';
 import CompanyProfile from './pages/CompanyProfile';
 import CompanyDashboard from './pages/CompanyDashboard';
 import NotFound from './pages/NotFound';
@@ -30,7 +30,8 @@ export default function App() {
           <Route path="/my-bookings" element={<ProtectedRoute><MyBookings /></ProtectedRoute>} />
           <Route path="/company-dashboard" element={<ProtectedRoute roles={['exhibitor', 'admin']}><CompanyDashboard /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/admin/events/new" element={<ProtectedRoute roles={['admin']}><AdminCreateEvent /></ProtectedRoute>} />
+          <Route path="/admin/events/new" element={<ProtectedRoute roles={['admin']}><AdminEventForm /></ProtectedRoute>} />
+          <Route path="/admin/events/:slug/edit" element={<ProtectedRoute roles={['admin']}><AdminEventForm /></ProtectedRoute>} />
           <Route path="/admin/floor-plan" element={<ProtectedRoute roles={['admin']}><AdminFloorPlan /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>

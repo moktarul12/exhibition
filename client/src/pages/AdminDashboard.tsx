@@ -4,7 +4,7 @@ import { api, formatINR, formatDate } from '../api';
 import type { Exhibition } from '../types';
 import { Stat, Spinner, StatusBadge } from '../components/ui';
 import { stallColors } from '../components/ui';
-import { Ticket, Building, Grid, Rupee, Calendar, Users, Eye } from '../components/icons';
+import { Ticket, Building, Grid, Rupee, Calendar, Users } from '../components/icons';
 import { useAuth } from '../auth';
 
 interface Dashboard {
@@ -40,7 +40,7 @@ export default function AdminDashboard() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link to="/admin/events/new" className="btn-outline">Create event</Link>
-          <Link to="/admin/floor-plan" className="btn-primary">Create floor plan</Link>
+          <Link to="/admin/floor-plan" className="btn-primary">Edit floor plans</Link>
         </div>
       </div>
 
@@ -134,7 +134,7 @@ export default function AdminDashboard() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr><th className="px-5 py-3">Exhibition</th><th className="px-5 py-3">Dates</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Stalls</th><th className="px-5 py-3">Bookings</th><th className="px-5 py-3"></th></tr>
+              <tr><th className="px-5 py-3">Exhibition</th><th className="px-5 py-3">Dates</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Stalls</th><th className="px-5 py-3">Bookings</th><th className="px-5 py-3">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {exhibitions.map((e) => (
@@ -149,7 +149,13 @@ export default function AdminDashboard() {
                   <td className="px-5 py-3"><StatusBadge status={e.status} /></td>
                   <td className="px-5 py-3 text-slate-600">{e.available_stalls}/{e.total_stalls}</td>
                   <td className="px-5 py-3 font-semibold">{(e as any).bookings}</td>
-                  <td className="px-5 py-3"><Link to={`/exhibitions/${e.slug}`} className="btn-ghost"><Eye width={16} /> View</Link></td>
+                  <td className="px-5 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Link to={`/admin/events/${e.slug}/edit`} className="text-xs font-semibold text-brand-700 hover:underline">Edit event</Link>
+                      <Link to={`/admin/floor-plan?slug=${encodeURIComponent(e.slug)}`} className="text-xs font-semibold text-ink-600 hover:underline">Edit floor plan</Link>
+                      <Link to={`/exhibitions/${e.slug}`} className="text-xs font-semibold text-ink-500 hover:underline">View</Link>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

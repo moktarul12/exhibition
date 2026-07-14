@@ -100,7 +100,7 @@ export default function Navbar() {
                       <>
                         <MenuItem to="/admin" icon={<Dashboard width={18} />} onClick={() => setUserMenu(false)}>Admin dashboard</MenuItem>
                         <MenuItem to="/admin/events/new" icon={<Ticket width={18} />} onClick={() => setUserMenu(false)}>Create event</MenuItem>
-                        <MenuItem to="/admin/floor-plan" icon={<Grid width={18} />} onClick={() => setUserMenu(false)}>Create floor plan</MenuItem>
+                        <MenuItem to="/admin/floor-plan" icon={<Grid width={18} />} onClick={() => setUserMenu(false)}>Edit floor plan</MenuItem>
                       </>
                     )}
                     <button onClick={handleLogout} className="flex w-full items-center gap-2.5 px-4 py-3 text-sm font-medium text-brand-700 hover:bg-brand-50"><LogOut width={18} /> Logout</button>
