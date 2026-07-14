@@ -23,12 +23,13 @@ export function Logo({ light = false, withTagline = false }: { light?: boolean; 
   );
 }
 
-export function StatusBadge({ status, size = 'md' }: { status: 'live' | 'upcoming' | 'past'; size?: 'sm' | 'md' }) {
+export function StatusBadge({ status, size = 'md' }: { status: 'live' | 'upcoming' | 'past' | 'disabled'; size?: 'sm' | 'md' }) {
   const map = {
     live: { label: 'Live now', cls: 'bg-brand text-white', dot: true },
     upcoming: { label: 'Upcoming', cls: 'bg-amber-100 text-amber-800', dot: false },
     past: { label: 'Completed', cls: 'bg-ink-100 text-ink-500', dot: false },
-  }[status];
+    disabled: { label: 'Disabled', cls: 'bg-rose-100 text-rose-800', dot: false },
+  }[status] || { label: String(status), cls: 'bg-ink-100 text-ink-500', dot: false };
   return (
     <span className={`pill ${map.cls} ${size === 'sm' ? 'text-[10px] px-2.5' : ''}`}>
       {map.dot && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />}

@@ -76,6 +76,8 @@ export const SCHEMA_STATEMENTS = [
     youtube_url TEXT,
     reel_url TEXT,
     address TEXT,
+    floor_plan_url TEXT,
+    floor_plan_mode TEXT NOT NULL DEFAULT 'both',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (organizer_id) REFERENCES organizers(id)
   )`,
@@ -86,6 +88,8 @@ export const SCHEMA_STATEMENTS = [
     name TEXT NOT NULL,
     grid_rows INTEGER NOT NULL DEFAULT 6,
     grid_cols INTEGER NOT NULL DEFAULT 8,
+    row_layout TEXT,
+    markers TEXT,
     FOREIGN KEY (exhibition_id) REFERENCES exhibitions(id)
   )`,
 
@@ -102,6 +106,9 @@ export const SCHEMA_STATEMENTS = [
     price INTEGER NOT NULL DEFAULT 45000,
     grid_row INTEGER NOT NULL,
     grid_col INTEGER NOT NULL,
+    span_cols INTEGER NOT NULL DEFAULT 1,
+    span_rows INTEGER NOT NULL DEFAULT 1,
+    display_size TEXT NOT NULL DEFAULT 'medium',
     booked_by_company_id INTEGER,
     description TEXT,
     facilities TEXT,
@@ -212,6 +219,22 @@ export const SCHEMA_STATEMENTS = [
 export async function initSchema() {
   for (const stmt of SCHEMA_STATEMENTS) {
     await db.execute(stmt);
+  }
+  const migrations = [
+    'ALTER TABLE halls ADD COLUMN row_layout TEXT',
+    'ALTER TABLE halls ADD COLUMN markers TEXT',
+    'ALTER TABLE stalls ADD COLUMN span_cols INTEGER NOT NULL DEFAULT 1',
+    'ALTER TABLE stalls ADD COLUMN span_rows INTEGER NOT NULL DEFAULT 1',
+    'ALTER TABLE stalls ADD COLUMN display_size TEXT NOT NULL DEFAULT \'medium\'',
+    'ALTER TABLE exhibitions ADD COLUMN floor_plan_url TEXT',
+    'ALTER TABLE exhibitions ADD COLUMN floor_plan_mode TEXT NOT NULL DEFAULT \'both\'',
+  ];
+  for (const sql of migrations) {
+    try {
+      await db.execute(sql);
+    } catch {
+      /* column already exists */
+    }
   }
 }
 

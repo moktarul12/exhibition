@@ -24,7 +24,7 @@ export interface Exhibition {
   organizer_id: number;
   start_date: string;
   end_date: string;
-  status: 'live' | 'upcoming' | 'past';
+  status: 'live' | 'upcoming' | 'past' | 'disabled';
   price_from: number;
   visitors_today: number;
   total_visitors: number;
@@ -39,6 +39,8 @@ export interface Exhibition {
   youtube_url?: string;
   reel_url?: string;
   address?: string;
+  floor_plan_url?: string;
+  floor_plan_mode?: 'attached' | 'interactive' | 'both';
   total_stalls?: number;
   available_stalls?: number;
   booked_stalls?: number;
@@ -62,9 +64,31 @@ export interface Hall {
   name: string;
   grid_rows: number;
   grid_cols: number;
+  /** Per-row stall counts, e.g. [10, 5, 8] — one row can have 10 stalls, next only 5 */
+  row_layout?: number[];
+  markers?: FloorMarkers;
+}
+
+export type FloorMarkerKind = 'enter' | 'exit' | 'lounge' | 'food' | 'restroom' | 'info' | 'stage' | 'clinic' | 'custom';
+
+export interface FloorMarker {
+  id: string;
+  kind: FloorMarkerKind;
+  label: string;
+  grid_row: number;
+  grid_col: number;
+  span_cols?: number;
+  span_rows?: number;
+}
+
+export interface FloorMarkers {
+  entrance_label: string;
+  exit_label: string;
+  items: FloorMarker[];
 }
 
 export type StallStatus = 'available' | 'reserved' | 'booked' | 'sponsor' | 'blocked';
+export type StallDisplaySize = 'small' | 'medium' | 'large' | 'xlarge';
 
 export interface MediaDoc {
   name: string;
@@ -85,6 +109,9 @@ export interface Stall {
   price: number;
   grid_row: number;
   grid_col: number;
+  span_cols?: number;
+  span_rows?: number;
+  display_size?: StallDisplaySize;
   company_name?: string;
   company_logo?: string;
   company_id?: number;

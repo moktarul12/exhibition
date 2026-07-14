@@ -6,6 +6,7 @@ import { stallColors } from './ui';
 import { useAuth } from '../auth';
 import { Search, X, Check, Grid, Download, Phone, Mail, Globe, ArrowRight, Building } from './icons';
 import { toEmbedUrl } from '../media';
+import { hallRowLayout, hallMarkers, stallSpans, MARKER_META } from '../floorLayout';
 
 export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; exhibitionName: string }) {
   const { user } = useAuth();
@@ -21,6 +22,12 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
   const [form, setForm] = useState({ company_name: '', contact_person: '', contact_email: '', contact_phone: '', payment_mode: 'UPI' });
 
   const hall = halls.find((h) => h.id === hallId);
+  const layout = hallRowLayout(hall);
+  const markers = hallMarkers(hall);
+  const maxCols = Math.max(...layout, 1);
+  const rowsN = layout.length;
+  const CELL = 54;
+  const GAP = 6;
 
   const loadStalls = () => {
     if (!hallId) return;
@@ -54,9 +61,11 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
     } finally { setBooking(false); }
   };
 
-  const cols = hall?.grid_cols ?? 8;
-  const rowsN = hall?.grid_rows ?? 6;
   const hasCompany = !!(selected?.company_id || selected?.company_name);
+  const cellStyle = (row: number, col: number, spanCols = 1, spanRows = 1): React.CSSProperties => ({
+    gridColumn: `${col + 1} / span ${spanCols}`,
+    gridRow: `${row + 1} / span ${spanRows}`,
+  });
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_400px]">
@@ -85,26 +94,58 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
           <div className="grid h-64 place-items-center text-ink-400">Loading floor plan…</div>
         ) : (
           <div className="overflow-x-auto p-5">
-            <div className="mx-auto rounded-2xl bg-gradient-to-b from-ink-50 to-white p-4" style={{ minWidth: cols * 62 }}>
-              <div className="mb-2 rounded-full bg-brand-600/90 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-white">Main entrance</div>
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }}>
-                {Array.from({ length: rowsN * cols }).map((_, idx) => {
-                  const row = Math.floor(idx / cols);
-                  const col = idx % cols;
-                  const stall = stalls.find((s) => s.grid_row === row && s.grid_col === col);
-                  if (!stall) {
-                    const isLounge = (row === 2 || row === 3) && (col === 3 || col === 4);
-                    return <div key={idx} className={`grid h-14 place-items-center rounded-xl text-[9px] font-semibold ${isLounge ? 'bg-ink-200/70 text-ink-400' : ''}`}>{row === 2 && col === 3 ? 'LOUNGE' : ''}</div>;
-                  }
+            <div className="mx-auto rounded-2xl bg-gradient-to-b from-ink-50 to-white p-4" style={{ minWidth: maxCols * (CELL + GAP) + 24 }}>
+              <div className="mb-2 rounded-full bg-brand-600/90 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-white">
+                {markers.entrance_label}
+              </div>
+              <div
+                className="relative mx-auto"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${maxCols}, ${CELL}px)`,
+                  gridTemplateRows: `repeat(${rowsN}, ${CELL}px)`,
+                  gap: GAP,
+                  width: maxCols * CELL + (maxCols - 1) * GAP,
+                }}
+              >
+                {Array.from({ length: rowsN * maxCols }).map((_, idx) => {
+                  const row = Math.floor(idx / maxCols);
+                  const col = idx % maxCols;
+                  const inLayout = col < (layout[row] || 0);
+                  return (
+                    <div
+                      key={`${row}:${col}`}
+                      style={cellStyle(row, col)}
+                      className={inLayout ? 'rounded-xl bg-ink-50/40' : ''}
+                    />
+                  );
+                })}
+                {markers.items.map((m) => {
+                  const meta = MARKER_META[m.kind] || MARKER_META.custom;
+                  return (
+                    <div
+                      key={m.id}
+                      style={cellStyle(m.grid_row, m.grid_col, m.span_cols || 1, m.span_rows || 1)}
+                      className={`z-[5] grid place-items-center rounded-xl border text-[10px] font-bold ${meta.className}`}
+                    >
+                      {m.label}
+                    </div>
+                  );
+                })}
+                {stalls.map((stall) => {
+                  const { span_cols, span_rows, display_size } = stallSpans(stall);
                   const c = stallColors[stall.status];
                   const isMatch = search && stall.code.includes(search);
                   const isSel = selected?.id === stall.id;
+                  const sizeCls = display_size === 'small' ? 'text-[9px]' : 'text-[11px]';
                   return (
                     <button
-                      key={idx}
+                      key={stall.id}
+                      type="button"
                       onClick={() => openStall(stall)}
                       title={stall.company_name ? `${stall.code} · ${stall.company_name}` : `${stall.code} · ${c.label}`}
-                      className={`relative grid h-14 place-items-center rounded-xl border text-[11px] font-bold transition-all hover:scale-[1.03] ${c.bg} ${c.border} ${c.text} ${isSel ? 'ring-2 ring-brand-600 ring-offset-2' : ''} ${isMatch ? 'ring-2 ring-brand-500 animate-pulse' : ''}`}
+                      style={cellStyle(stall.grid_row, stall.grid_col, span_cols, span_rows)}
+                      className={`relative z-10 grid place-items-center rounded-xl border font-bold transition-all hover:scale-[1.02] ${sizeCls} ${c.bg} ${c.border} ${c.text} ${isSel ? 'ring-2 ring-brand-600 ring-offset-2' : ''} ${isMatch ? 'ring-2 ring-brand-500 animate-pulse' : ''}`}
                     >
                       {stall.company_logo ? (
                         <img src={stall.company_logo} alt="" className="h-7 w-7 rounded-md object-cover shadow-sm" />
@@ -114,7 +155,9 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
                   );
                 })}
               </div>
-              <div className="mt-2 rounded-full bg-ink-200/80 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-ink-500">Exit / registration</div>
+              <div className="mt-2 rounded-full bg-ink-200/80 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-ink-500">
+                {markers.exit_label}
+              </div>
             </div>
             <p className="mt-3 text-center text-xs text-ink-400">Tap any stall to see the exhibitor company and details</p>
           </div>

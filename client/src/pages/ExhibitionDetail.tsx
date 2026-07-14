@@ -4,6 +4,7 @@ import { api, formatDate, formatINR, daysUntil, dayOfEvent } from '../api';
 import type { Exhibition, Hall, Organizer, Seminar, Company, ExhibitionComment, ExhibitionMedia, MediaDoc } from '../types';
 import { StatusBadge, Spinner } from '../components/ui';
 import FloorPlan from '../components/FloorPlan';
+import AttachedFloorPlan from '../components/AttachedFloorPlan';
 import {
   MapPin, Calendar, Users, Grid, Ticket, Building, Clock, Globe, Phone, Mail, ArrowRight, Star,
   Heart, Bookmark, Download, Instagram, Youtube, Facebook, Linkedin, Twitter, Check,
@@ -57,6 +58,7 @@ export default function ExhibitionDetail() {
   const [following, setFollowing] = useState(false);
   const [shareOk, setShareOk] = useState(false);
   const [activeSection, setActiveSection] = useState('about');
+  const [floorView, setFloorView] = useState<'map' | 'book'>('map');
   const floorRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -66,6 +68,10 @@ export default function ExhibitionDetail() {
       setData(r.data);
       setFav(localStorage.getItem(favKey(slug)) === '1');
       if (r.data.organizer?.id) setFollowing(localStorage.getItem(followKey(r.data.organizer.id)) === '1');
+      const mode = r.data.floor_plan_mode || 'both';
+      const hasAttach = !!r.data.floor_plan_url;
+      if (mode === 'interactive' || (!hasAttach && mode !== 'attached')) setFloorView('book');
+      else setFloorView('map');
     }).finally(() => setLoading(false));
     api.get(`/exhibitions/${slug}/comments`).then((r) => setComments(r.data)).catch(() => setComments([]));
     api.get(`/exhibitions/${slug}/media`).then((r) => setMedia(r.data)).catch(() => setMedia([]));
@@ -296,11 +302,15 @@ export default function ExhibitionDetail() {
           </div>
         </section>
 
-        {/* Floor plan — most important */}
+        {/* Floor plan — attached map and/or interactive booking */}
         <section id="floor" ref={floorRef} className="scroll-mt-36">
           <SectionTitle
-            title="Interactive floor plan"
-            subtitle="Click any stall to open the exhibitor company, contacts and booth highlights."
+            title="Floor plan"
+            subtitle={
+              data.floor_plan_url
+                ? 'View the official organizer map, or book stalls on the interactive plan.'
+                : 'Click any stall to open the exhibitor company, contacts and booth highlights.'
+            }
           />
           <div className="mt-6">
             {data.status === 'past' ? (
@@ -308,7 +318,11 @@ export default function ExhibitionDetail() {
                 This exhibition has concluded. The final stall layout is archived.
               </div>
             ) : (
-              <FloorPlan halls={data.halls} exhibitionName={data.name} />
+              <FloorPlanSection
+                data={data}
+                floorView={floorView}
+                setFloorView={setFloorView}
+              />
             )}
           </div>
         </section>
@@ -689,6 +703,66 @@ function AddMediaForm({
       {ok && <p className="mt-2 text-sm text-emerald-600">Added — thanks for sharing!</p>}
       <button type="submit" disabled={busy || !url} className="btn-primary mt-4">{busy ? 'Saving…' : `Add ${kind}`}</button>
     </form>
+  );
+}
+
+function FloorPlanSection({
+  data,
+  floorView,
+  setFloorView,
+}: {
+  data: Detail;
+  floorView: 'map' | 'book';
+  setFloorView: (v: 'map' | 'book') => void;
+}) {
+  const mode = data.floor_plan_mode || 'both';
+  const hasAttach = !!data.floor_plan_url;
+  const hasInteractive = (data.halls?.length || 0) > 0;
+  const showTabs = hasAttach && hasInteractive && mode === 'both';
+  const showMap = hasAttach && (
+    mode === 'attached'
+    || (mode === 'both' && (!hasInteractive || floorView === 'map'))
+  );
+  const showBook = hasInteractive && (
+    mode === 'interactive'
+    || (mode === 'both' && (!hasAttach || floorView === 'book'))
+  );
+
+  if (!hasAttach && !hasInteractive) {
+    return (
+      <div className="rounded-3xl border border-dashed border-ink-200 bg-ink-50 py-12 text-center text-ink-500">
+        Floor plan coming soon.
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {showTabs && (
+        <div className="mb-4 inline-flex rounded-full border border-ink-200 bg-white p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setFloorView('map')}
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${floorView === 'map' ? 'bg-brand-600 text-white' : 'text-ink-600 hover:bg-ink-50'}`}
+          >
+            Official map
+          </button>
+          <button
+            type="button"
+            onClick={() => setFloorView('book')}
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${floorView === 'book' ? 'bg-brand-600 text-white' : 'text-ink-600 hover:bg-ink-50'}`}
+          >
+            Book stalls
+          </button>
+        </div>
+      )}
+      {showMap && data.floor_plan_url && (
+        <div className={showBook && showTabs ? 'mb-6' : ''}>
+          <AttachedFloorPlan url={data.floor_plan_url} title={`${data.name} · official floor plan`} />
+        </div>
+      )}
+      {showBook && <FloorPlan halls={data.halls} exhibitionName={data.name} />}
+    </>
   );
 }
 

@@ -39,6 +39,7 @@ export default function AdminDashboard() {
           <p className="text-sm text-slate-500">Welcome back, {user?.name}. Here's how your exhibitions are performing.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to="/admin/discover" className="btn-outline">Discover events (AI)</Link>
           <Link to="/admin/events/new" className="btn-outline">Create event</Link>
           <Link to="/admin/floor-plan" className="btn-primary">Edit floor plans</Link>
         </div>
@@ -154,6 +155,42 @@ export default function AdminDashboard() {
                       <Link to={`/admin/events/${e.slug}/edit`} className="text-xs font-semibold text-brand-700 hover:underline">Edit event</Link>
                       <Link to={`/admin/floor-plan?slug=${encodeURIComponent(e.slug)}`} className="text-xs font-semibold text-ink-600 hover:underline">Edit floor plan</Link>
                       <Link to={`/exhibitions/${e.slug}`} className="text-xs font-semibold text-ink-500 hover:underline">View</Link>
+                      {e.status === 'disabled' ? (
+                        <button
+                          type="button"
+                          className="text-xs font-semibold text-emerald-700 hover:underline"
+                          onClick={async () => {
+                            if (!confirm(`Re-enable “${e.name}”?`)) return;
+                            await api.post(`/admin/exhibitions/${e.slug}/enable`, { status: 'upcoming' });
+                            setExhibitions((list) => list.map((x) => (x.id === e.id ? { ...x, status: 'upcoming' } : x)));
+                          }}
+                        >
+                          Enable
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="text-xs font-semibold text-amber-700 hover:underline"
+                          onClick={async () => {
+                            if (!confirm(`Disable “${e.name}”? It will hide from the public listings.`)) return;
+                            await api.post(`/admin/exhibitions/${e.slug}/disable`);
+                            setExhibitions((list) => list.map((x) => (x.id === e.id ? { ...x, status: 'disabled' } : x)));
+                          }}
+                        >
+                          Disable
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-rose-700 hover:underline"
+                        onClick={async () => {
+                          if (!confirm(`Permanently delete “${e.name}”? This cannot be undone.`)) return;
+                          await api.delete(`/admin/exhibitions/${e.slug}`);
+                          setExhibitions((list) => list.filter((x) => x.id !== e.id));
+                        }}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>

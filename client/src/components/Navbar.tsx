@@ -99,6 +99,7 @@ export default function Navbar() {
                     {user.role === 'admin' && (
                       <>
                         <MenuItem to="/admin" icon={<Dashboard width={18} />} onClick={() => setUserMenu(false)}>Admin dashboard</MenuItem>
+                        <MenuItem to="/admin/discover" icon={<Search width={18} />} onClick={() => setUserMenu(false)}>Discover events (AI)</MenuItem>
                         <MenuItem to="/admin/events/new" icon={<Ticket width={18} />} onClick={() => setUserMenu(false)}>Create event</MenuItem>
                         <MenuItem to="/admin/floor-plan" icon={<Grid width={18} />} onClick={() => setUserMenu(false)}>Edit floor plan</MenuItem>
                       </>

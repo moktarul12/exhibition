@@ -8,13 +8,16 @@ import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
 import { initSchema } from './schema.js';
 import { signToken, authRequired, requireRole, authOptional } from './auth.js';
+import { normalizeRowLayout, mapHall as mapHallLayout, defaultHallMarkers, spansForSize, rectFitsLayout, rectsOverlap, normalizeMarkers } from './floorLayout.js';
+import { discoverEvents } from './discoverEvents.js';
+import { analyzeFloorPlanImage } from './analyzeFloorPlan.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientDist = path.resolve(__dirname, '..', '..', 'client', 'dist');
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN?.split(',') || '*' }));
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 
 const rows = (r) => r.rows;
 const one = (r) => r.rows[0] || null;
@@ -27,6 +30,117 @@ function publicUser(u) {
 }
 function mapExhibition(e) {
   return { ...e, tags: parseJSON(e.tags, []), gallery: parseJSON(e.gallery, []), documents: parseJSON(e.documents, []) };
+}
+function mapHall(h) {
+  return mapHallLayout(h, parseJSON);
+}
+
+async function insertHallWithLayout(exhibitionId, hallName, rowLayoutInput, grid_rows, grid_cols, letterHint) {
+  const { layout, grid_rows: rowsN, grid_cols: colsN } = normalizeRowLayout(rowLayoutInput, grid_rows, grid_cols);
+  const markers = defaultHallMarkers();
+  const hr = await db.execute({
+    sql: `INSERT INTO halls (exhibition_id,name,grid_rows,grid_cols,row_layout,markers) VALUES (?,?,?,?,?,?)`,
+    args: [exhibitionId, hallName, rowsN, colsN, JSON.stringify(layout), JSON.stringify(markers)],
+  });
+  const hallId = Number(hr.lastInsertRowid);
+  const letter = letterHint || hallName.match(/Hall\s+([A-Z])/i)?.[1]?.toUpperCase() || 'H';
+  let n = 0;
+  for (let row = 0; row < layout.length; row++) {
+    for (let col = 0; col < layout[row]; col++) {
+      n += 1;
+      const code = `${letter}-${String(n).padStart(2, '0')}`;
+      const isCorner = col === 0 || col === layout[row] - 1;
+      const isPremium = row < 2;
+      const price = (isPremium ? 65000 : 42000) + (isCorner ? 8000 : 0);
+      await db.execute({
+        sql: `INSERT INTO stalls (hall_id,code,zone,type,status,width,depth,area,price,grid_row,grid_col,span_cols,span_rows,display_size,description,facilities)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        args: [
+          hallId, code, isPremium ? 'Premium' : 'Standard', isCorner ? 'Corner' : 'Standard', 'available',
+          3, 3, 9, price, row, col, 1, 1, 'medium',
+          `${isPremium ? 'Premium' : 'Standard'} stall in ${hallName}.`,
+          JSON.stringify(['Electricity 15A', 'Wi‑Fi', 'Spotlights', 'Carpet', 'Fascia board']),
+        ],
+      });
+    }
+  }
+  return one(await db.execute({ sql: 'SELECT * FROM halls WHERE id=?', args: [hallId] }));
+}
+
+/** Build an empty grid hall and place only AI-detected stalls + markers. */
+async function createHallFromAiAnalysis(exhibitionId, hallName, analysis) {
+  const rowsN = analysis.grid_rows;
+  const colsN = analysis.grid_cols;
+  const layout = analysis.row_layout || Array.from({ length: rowsN }, () => colsN);
+  const markersJson = JSON.stringify(analysis.markers || defaultHallMarkers());
+  const hr = await db.execute({
+    sql: `INSERT INTO halls (exhibition_id,name,grid_rows,grid_cols,row_layout,markers) VALUES (?,?,?,?,?,?)`,
+    args: [exhibitionId, hallName, rowsN, colsN, JSON.stringify(layout), markersJson],
+  });
+  const hallId = Number(hr.lastInsertRowid);
+  const placed = [];
+  for (const s of analysis.stalls || []) {
+    const rect = {
+      row: s.grid_row,
+      col: s.grid_col,
+      span_rows: s.span_rows || 1,
+      span_cols: s.span_cols || 1,
+    };
+    if (!rectFitsLayout(layout, rect.row, rect.col, rect.span_rows, rect.span_cols)) continue;
+    if (placed.some((p) => rectsOverlap(p, rect))) continue;
+    placed.push(rect);
+    const desc = s.label ? `${s.label} · AI from floor plan.` : 'Stall digitised from attached floor plan.';
+    await db.execute({
+      sql: `INSERT INTO stalls (hall_id,code,zone,type,status,width,depth,area,price,grid_row,grid_col,span_cols,span_rows,display_size,description,facilities)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      args: [
+        hallId, s.code, s.zone || 'Standard', s.type || 'Standard', 'available',
+        rect.span_cols * 3, rect.span_rows * 3, rect.span_cols * rect.span_rows * 9,
+        s.price || 45000, s.grid_row, s.grid_col, rect.span_cols, rect.span_rows, s.display_size || 'medium',
+        desc, JSON.stringify(['Electricity 15A', 'Wi‑Fi', 'Spotlights', 'Carpet']),
+      ],
+    });
+  }
+  return {
+    hall: mapHall(one(await db.execute({ sql: 'SELECT * FROM halls WHERE id=?', args: [hallId] }))),
+    stalls_created: placed.length,
+    markers_created: analysis.markers?.items?.length || 0,
+  };
+}
+
+async function occupancyBlocks(hallId, excludeStallId = null) {
+  const stallRows = rows(await db.execute({ sql: 'SELECT * FROM stalls WHERE hall_id=?', args: [hallId] }));
+  const h = mapHall(one(await db.execute({ sql: 'SELECT * FROM halls WHERE id=?', args: [hallId] })));
+  const blocks = [];
+  for (const s of stallRows) {
+    if (excludeStallId != null && Number(s.id) === Number(excludeStallId)) continue;
+    blocks.push({
+      kind: 'stall',
+      id: s.id,
+      row: s.grid_row,
+      col: s.grid_col,
+      span_rows: Number(s.span_rows) || 1,
+      span_cols: Number(s.span_cols) || 1,
+    });
+  }
+  for (const m of h.markers?.items || []) {
+    blocks.push({
+      kind: 'marker',
+      id: m.id,
+      row: m.grid_row,
+      col: m.grid_col,
+      span_rows: m.span_rows || 1,
+      span_cols: m.span_cols || 1,
+    });
+  }
+  return { hall: h, blocks };
+}
+
+function collides(blocks, rect) {
+  return blocks.some((b) => rectsOverlap(
+    { row: b.row, col: b.col, span_rows: b.span_rows, span_cols: b.span_cols },
+    { row: rect.row, col: rect.col, span_rows: rect.span_rows, span_cols: rect.span_cols },
+  ));
 }
 
 // ---------------- Health ----------------
@@ -70,14 +184,15 @@ app.get('/api/auth/me', authRequired, async (req, res) => {
 
 // ---------------- Exhibitions ----------------
 app.get('/api/exhibitions', async (req, res) => {
-  const { status, industry, city, q, lat, lng, radius_km } = req.query;
+  const { status, industry, city, q, lat, lng, radius_km, include_disabled } = req.query;
   let sql = 'SELECT * FROM exhibitions WHERE 1=1';
   const args = [];
   if (status) { sql += ' AND status=?'; args.push(status); }
+  else if (include_disabled !== '1') { sql += " AND status!='disabled'"; }
   if (industry) { sql += ' AND industry=?'; args.push(industry); }
   if (city) { sql += ' AND city=?'; args.push(city); }
   if (q) { sql += ' AND (name LIKE ? OR industry LIKE ? OR venue LIKE ? OR city LIKE ?)'; const like = `%${q}%`; args.push(like, like, like, like); }
-  sql += " ORDER BY CASE status WHEN 'live' THEN 0 WHEN 'upcoming' THEN 1 ELSE 2 END, start_date";
+  sql += " ORDER BY CASE status WHEN 'live' THEN 0 WHEN 'upcoming' THEN 1 WHEN 'past' THEN 2 ELSE 3 END, start_date";
   const list = rows(await db.execute({ sql, args }));
   const userLat = lat != null ? Number(lat) : null;
   const userLng = lng != null ? Number(lng) : null;
@@ -125,6 +240,11 @@ app.get('/api/exhibitions/meta/filters', async (_req, res) => {
 app.get('/api/exhibitions/:slug', async (req, res) => {
   const e = one(await db.execute({ sql: 'SELECT * FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
   if (!e) return res.status(404).json({ error: 'Exhibition not found' });
+  if (e.status === 'disabled') {
+    // Admins can still open via edit/dashboard; public pages treat as missing
+    const auth = req.headers.authorization || '';
+    // Still return data so admin preview works; visitors see a soft message via client. Keep payload.
+  }
   const organizer = one(await db.execute({ sql: 'SELECT * FROM organizers WHERE id=?', args: [e.organizer_id] }));
   const counts = one(await db.execute({
     sql: `SELECT COUNT(*) total,
@@ -133,7 +253,7 @@ app.get('/api/exhibitions/:slug', async (req, res) => {
           FROM stalls s JOIN halls h ON s.hall_id=h.id WHERE h.exhibition_id=?`,
     args: [e.id],
   }));
-  const halls = rows(await db.execute({ sql: 'SELECT * FROM halls WHERE exhibition_id=? ORDER BY id', args: [e.id] }));
+  const halls = rows(await db.execute({ sql: 'SELECT * FROM halls WHERE exhibition_id=? ORDER BY id', args: [e.id] })).map(mapHall);
   const seminars = rows(await db.execute({ sql: 'SELECT * FROM seminars WHERE exhibition_id=? ORDER BY id', args: [e.id] }));
   const exhibitors = rows(await db.execute({
     sql: `SELECT ex.stall_code, ex.hall_name, c.* FROM exhibitors ex JOIN companies c ON ex.company_id=c.id WHERE ex.exhibition_id=?`,
@@ -447,6 +567,7 @@ app.post('/api/admin/exhibitions', authRequired, requireRole('admin'), async (re
       start_date, end_date, status = 'upcoming', price_from = 45000,
       entry_free = 0, international = 0, government = 0, b2b = 1, early_bird = 0,
       tags = [], youtube_url, reel_url, create_floor_plan = true, hall_count = 2, grid_rows = 6, grid_cols = 8,
+      row_layout, floor_plan_url, floor_plan_mode = 'both',
     } = req.body || {};
     if (!name?.trim() || !industry?.trim() || !venue?.trim() || !city?.trim() || !start_date || !end_date) {
       return res.status(400).json({ error: 'Name, industry, venue, city, start and end dates are required' });
@@ -464,10 +585,11 @@ app.post('/api/admin/exhibitions', authRequired, requireRole('admin'), async (re
       { name: 'Floor Plan Map.pdf', url: 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf', type: 'pdf' },
     ]);
     const defaultBanner = banner || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&h=500&q=80';
+    const mode = ['attached', 'interactive', 'both'].includes(floor_plan_mode) ? floor_plan_mode : 'both';
     const r = await db.execute({
       sql: `INSERT INTO exhibitions
-        (slug,name,tagline,industry,about,banner,venue,city,lat,lng,organizer_id,start_date,end_date,status,price_from,visitors_today,total_visitors,entry_free,international,government,b2b,early_bird,tags,gallery,documents,youtube_url,reel_url,address)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        (slug,name,tagline,industry,about,banner,venue,city,lat,lng,organizer_id,start_date,end_date,status,price_from,visitors_today,total_visitors,entry_free,international,government,b2b,early_bird,tags,gallery,documents,youtube_url,reel_url,address,floor_plan_url,floor_plan_mode)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
         slug, name.trim(), tagline || null, industry.trim(),
         about || `${name} at ${venue}, ${city}.`,
@@ -478,40 +600,16 @@ app.post('/api/admin/exhibitions', authRequired, requireRole('admin'), async (re
         entry_free ? 1 : 0, international ? 1 : 0, government ? 1 : 0, b2b ? 1 : 0, early_bird ? 1 : 0,
         JSON.stringify(Array.isArray(tags) ? tags : []), gallery, documents,
         youtube_url || null, reel_url || null, address || null,
+        floor_plan_url || null, mode,
       ],
     });
     const exhibitionId = Number(r.lastInsertRowid);
 
     if (create_floor_plan) {
       const hallsN = Math.min(Math.max(Number(hall_count) || 2, 1), 6);
-      const rowsN = Math.min(Math.max(Number(grid_rows) || 6, 3), 12);
-      const colsN = Math.min(Math.max(Number(grid_cols) || 8, 4), 16);
       for (let h = 0; h < hallsN; h++) {
         const hallName = `Hall ${String.fromCharCode(65 + h)}`;
-        const hr = await db.execute({
-          sql: `INSERT INTO halls (exhibition_id,name,grid_rows,grid_cols) VALUES (?,?,?,?)`,
-          args: [exhibitionId, hallName, rowsN, colsN],
-        });
-        const hallId = Number(hr.lastInsertRowid);
-        for (let row = 0; row < rowsN; row++) {
-          for (let col = 0; col < colsN; col++) {
-            if ((row === 2 || row === 3) && (col === 3 || col === 4) && colsN >= 6) continue;
-            const code = `${String.fromCharCode(65 + h)}-${String(row * colsN + col + 1).padStart(2, '0')}`;
-            const isCorner = col === 0 || col === colsN - 1 || row === 0 || row === rowsN - 1;
-            const isPremium = row < 2;
-            const price = (isPremium ? 65000 : 42000) + (isCorner ? 8000 : 0);
-            await db.execute({
-              sql: `INSERT INTO stalls (hall_id,code,zone,type,status,width,depth,area,price,grid_row,grid_col,description,facilities)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-              args: [
-                hallId, code, isPremium ? 'Premium' : 'Standard', isCorner ? 'Corner' : 'Standard', 'available',
-                3, 3, 9, price, row, col,
-                `${isPremium ? 'Premium' : 'Standard'} stall in ${hallName}.`,
-                JSON.stringify(['Electricity 15A', 'Wi‑Fi', 'Spotlights', 'Carpet', 'Fascia board']),
-              ],
-            });
-          }
-        }
+        await insertHallWithLayout(exhibitionId, hallName, row_layout, grid_rows, grid_cols, String.fromCharCode(65 + h));
       }
     }
 
@@ -528,34 +626,12 @@ app.post('/api/admin/exhibitions/:slug/halls', authRequired, requireRole('admin'
   try {
     const e = one(await db.execute({ sql: 'SELECT * FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
     if (!e) return res.status(404).json({ error: 'Exhibition not found' });
-    const { name, grid_rows = 6, grid_cols = 8 } = req.body || {};
+    const { name, grid_rows = 6, grid_cols = 8, row_layout } = req.body || {};
     const existing = rows(await db.execute({ sql: 'SELECT name FROM halls WHERE exhibition_id=? ORDER BY id', args: [e.id] }));
     const hallName = name?.trim() || `Hall ${String.fromCharCode(65 + existing.length)}`;
-    const rowsN = Math.min(Math.max(Number(grid_rows) || 6, 3), 12);
-    const colsN = Math.min(Math.max(Number(grid_cols) || 8, 4), 16);
-    const hr = await db.execute({
-      sql: `INSERT INTO halls (exhibition_id,name,grid_rows,grid_cols) VALUES (?,?,?,?)`,
-      args: [e.id, hallName, rowsN, colsN],
-    });
-    const hallId = Number(hr.lastInsertRowid);
     const letter = hallName.match(/Hall\s+([A-Z])/i)?.[1]?.toUpperCase() || String.fromCharCode(65 + existing.length);
-    for (let row = 0; row < rowsN; row++) {
-      for (let col = 0; col < colsN; col++) {
-        if ((row === 2 || row === 3) && (col === 3 || col === 4) && colsN >= 6) continue;
-        const code = `${letter}-${String(row * colsN + col + 1).padStart(2, '0')}`;
-        await db.execute({
-          sql: `INSERT INTO stalls (hall_id,code,zone,type,status,width,depth,area,price,grid_row,grid_col,description,facilities)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          args: [
-            hallId, code, row < 2 ? 'Premium' : 'Standard', (col === 0 || col === colsN - 1) ? 'Corner' : 'Standard',
-            'available', 3, 3, 9, row < 2 ? 65000 : 42000, row, col,
-            `Stall in ${hallName}.`, JSON.stringify(['Electricity 15A', 'Wi‑Fi', 'Spotlights', 'Carpet']),
-          ],
-        });
-      }
-    }
-    const hall = one(await db.execute({ sql: 'SELECT * FROM halls WHERE id=?', args: [hallId] }));
-    res.status(201).json(hall);
+    const hall = await insertHallWithLayout(e.id, hallName, row_layout, grid_rows, grid_cols, letter);
+    res.status(201).json(mapHall(hall));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not create hall' });
@@ -581,7 +657,7 @@ app.patch('/api/admin/exhibitions/:slug', authRequired, requireRole('admin'), as
       lng: b.lng !== undefined ? (b.lng == null || b.lng === '' ? null : Number(b.lng)) : e.lng,
       start_date: b.start_date || e.start_date,
       end_date: b.end_date || e.end_date,
-      status: ['live', 'upcoming', 'past'].includes(b.status) ? b.status : e.status,
+      status: ['live', 'upcoming', 'past', 'disabled'].includes(b.status) ? b.status : e.status,
       price_from: b.price_from != null ? Number(b.price_from) : e.price_from,
       entry_free: b.entry_free != null ? (b.entry_free ? 1 : 0) : e.entry_free,
       international: b.international != null ? (b.international ? 1 : 0) : e.international,
@@ -591,6 +667,10 @@ app.patch('/api/admin/exhibitions/:slug', authRequired, requireRole('admin'), as
       tags: b.tags != null ? JSON.stringify(Array.isArray(b.tags) ? b.tags : parseJSON(e.tags, [])) : e.tags,
       youtube_url: b.youtube_url !== undefined ? (b.youtube_url || null) : e.youtube_url,
       reel_url: b.reel_url !== undefined ? (b.reel_url || null) : e.reel_url,
+      floor_plan_url: b.floor_plan_url !== undefined ? (b.floor_plan_url || null) : e.floor_plan_url,
+      floor_plan_mode: ['attached', 'interactive', 'both'].includes(b.floor_plan_mode)
+        ? b.floor_plan_mode
+        : (e.floor_plan_mode || 'both'),
     };
     if (!fields.name || !fields.industry || !fields.venue || !fields.city || !fields.start_date || !fields.end_date) {
       return res.status(400).json({ error: 'Name, industry, venue, city, start and end dates are required' });
@@ -599,13 +679,13 @@ app.patch('/api/admin/exhibitions/:slug', authRequired, requireRole('admin'), as
       sql: `UPDATE exhibitions SET
         name=?, tagline=?, industry=?, about=?, banner=?, venue=?, city=?, address=?, lat=?, lng=?,
         start_date=?, end_date=?, status=?, price_from=?, entry_free=?, international=?, government=?, b2b=?, early_bird=?,
-        tags=?, youtube_url=?, reel_url=?
+        tags=?, youtube_url=?, reel_url=?, floor_plan_url=?, floor_plan_mode=?
         WHERE id=?`,
       args: [
         fields.name, fields.tagline, fields.industry, fields.about, fields.banner, fields.venue, fields.city, fields.address,
         fields.lat, fields.lng, fields.start_date, fields.end_date, fields.status, fields.price_from,
         fields.entry_free, fields.international, fields.government, fields.b2b, fields.early_bird,
-        fields.tags, fields.youtube_url, fields.reel_url, e.id,
+        fields.tags, fields.youtube_url, fields.reel_url, fields.floor_plan_url, fields.floor_plan_mode, e.id,
       ],
     });
     const updated = one(await db.execute({ sql: 'SELECT * FROM exhibitions WHERE id=?', args: [e.id] }));
@@ -616,15 +696,96 @@ app.patch('/api/admin/exhibitions/:slug', authRequired, requireRole('admin'), as
   }
 });
 
-// Rename / update hall metadata
+// Soft-disable / hard-delete exhibition
+app.post('/api/admin/exhibitions/:slug/disable', authRequired, requireRole('admin'), async (req, res) => {
+  try {
+    const e = one(await db.execute({ sql: 'SELECT * FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
+    if (!e) return res.status(404).json({ error: 'Exhibition not found' });
+    await db.execute({ sql: "UPDATE exhibitions SET status='disabled' WHERE id=?", args: [e.id] });
+    const updated = one(await db.execute({ sql: 'SELECT * FROM exhibitions WHERE id=?', args: [e.id] }));
+    res.json(mapExhibition(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not disable exhibition' });
+  }
+});
+
+app.post('/api/admin/exhibitions/:slug/enable', authRequired, requireRole('admin'), async (req, res) => {
+  try {
+    const e = one(await db.execute({ sql: 'SELECT * FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
+    if (!e) return res.status(404).json({ error: 'Exhibition not found' });
+    const next = ['live', 'upcoming', 'past'].includes(req.body?.status) ? req.body.status : 'upcoming';
+    await db.execute({ sql: 'UPDATE exhibitions SET status=? WHERE id=?', args: [next, e.id] });
+    const updated = one(await db.execute({ sql: 'SELECT * FROM exhibitions WHERE id=?', args: [e.id] }));
+    res.json(mapExhibition(updated));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not enable exhibition' });
+  }
+});
+
+app.delete('/api/admin/exhibitions/:slug', authRequired, requireRole('admin'), async (req, res) => {
+  try {
+    const e = one(await db.execute({ sql: 'SELECT * FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
+    if (!e) return res.status(404).json({ error: 'Exhibition not found' });
+    const halls = rows(await db.execute({ sql: 'SELECT id FROM halls WHERE exhibition_id=?', args: [e.id] }));
+    for (const h of halls) {
+      const stalls = rows(await db.execute({ sql: 'SELECT id FROM stalls WHERE hall_id=?', args: [h.id] }));
+      for (const s of stalls) {
+        await db.execute({ sql: 'DELETE FROM bookings WHERE stall_id=?', args: [s.id] });
+      }
+      await db.execute({ sql: 'DELETE FROM stalls WHERE hall_id=?', args: [h.id] });
+      await db.execute({ sql: 'DELETE FROM halls WHERE id=?', args: [h.id] });
+    }
+    await db.execute({ sql: 'DELETE FROM bookings WHERE exhibition_id=?', args: [e.id] });
+    await db.execute({ sql: 'DELETE FROM exhibitors WHERE exhibition_id=?', args: [e.id] });
+    await db.execute({ sql: 'DELETE FROM seminars WHERE exhibition_id=?', args: [e.id] });
+    await db.execute({ sql: 'DELETE FROM exhibition_comments WHERE exhibition_id=?', args: [e.id] });
+    await db.execute({ sql: 'DELETE FROM exhibition_media WHERE exhibition_id=?', args: [e.id] });
+    await db.execute({ sql: 'DELETE FROM exhibitions WHERE id=?', args: [e.id] });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not delete exhibition' });
+  }
+});
+
+// Rename / update hall metadata (including custom row layout + markers)
 app.patch('/api/admin/halls/:id', authRequired, requireRole('admin'), async (req, res) => {
   try {
     const h = one(await db.execute({ sql: 'SELECT * FROM halls WHERE id=?', args: [req.params.id] }));
     if (!h) return res.status(404).json({ error: 'Hall not found' });
     const name = req.body?.name != null ? String(req.body.name).trim() : h.name;
     if (!name) return res.status(400).json({ error: 'Hall name is required' });
-    await db.execute({ sql: 'UPDATE halls SET name=? WHERE id=?', args: [name, h.id] });
-    res.json({ ...h, name });
+
+    let layoutSql = h.row_layout;
+    let rowsN = h.grid_rows;
+    let colsN = h.grid_cols;
+    if (req.body?.row_layout != null) {
+      const { layout, grid_rows, grid_cols } = normalizeRowLayout(req.body.row_layout, h.grid_rows, h.grid_cols);
+      layoutSql = JSON.stringify(layout);
+      rowsN = grid_rows;
+      colsN = grid_cols;
+      const outs = rows(await db.execute({ sql: 'SELECT id, grid_row, grid_col, span_cols, span_rows FROM stalls WHERE hall_id=?', args: [h.id] }));
+      for (const s of outs) {
+        if (!rectFitsLayout(layout, s.grid_row, s.grid_col, Number(s.span_rows) || 1, Number(s.span_cols) || 1)) {
+          await db.execute({ sql: 'DELETE FROM bookings WHERE stall_id=?', args: [s.id] });
+          await db.execute({ sql: 'DELETE FROM stalls WHERE id=?', args: [s.id] });
+        }
+      }
+    }
+
+    let markersSql = h.markers;
+    if (req.body?.markers != null) {
+      markersSql = JSON.stringify(normalizeMarkers(req.body.markers, parseJSON));
+    }
+
+    await db.execute({
+      sql: 'UPDATE halls SET name=?, grid_rows=?, grid_cols=?, row_layout=?, markers=? WHERE id=?',
+      args: [name, rowsN, colsN, layoutSql, markersSql, h.id],
+    });
+    const updated = one(await db.execute({ sql: 'SELECT * FROM halls WHERE id=?', args: [h.id] }));
+    res.json(mapHall(updated));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not update hall' });
@@ -648,28 +809,32 @@ app.delete('/api/admin/halls/:id', authRequired, requireRole('admin'), async (re
 // Add a single stall into an empty grid cell
 app.post('/api/admin/halls/:id/stalls', authRequired, requireRole('admin'), async (req, res) => {
   try {
-    const h = one(await db.execute({ sql: 'SELECT * FROM halls WHERE id=?', args: [req.params.id] }));
-    if (!h) return res.status(404).json({ error: 'Hall not found' });
+    const hRaw = one(await db.execute({ sql: 'SELECT * FROM halls WHERE id=?', args: [req.params.id] }));
+    if (!hRaw) return res.status(404).json({ error: 'Hall not found' });
+    const h = mapHall(hRaw);
     const row = Number(req.body?.grid_row);
     const col = Number(req.body?.grid_col);
-    if (Number.isNaN(row) || Number.isNaN(col) || row < 0 || col < 0 || row >= h.grid_rows || col >= h.grid_cols) {
-      return res.status(400).json({ error: 'Valid grid_row and grid_col are required' });
+    const sizeInfo = spansForSize(req.body?.display_size || 'medium');
+    const span_cols = Math.min(Math.max(Number(req.body?.span_cols) || sizeInfo.span_cols, 1), 4);
+    const span_rows = Math.min(Math.max(Number(req.body?.span_rows) || sizeInfo.span_rows, 1), 4);
+    if (Number.isNaN(row) || Number.isNaN(col) || !rectFitsLayout(h.row_layout, row, col, span_rows, span_cols)) {
+      return res.status(400).json({ error: 'Stall footprint must fit inside the row layout' });
     }
-    const existing = one(await db.execute({
-      sql: 'SELECT id FROM stalls WHERE hall_id=? AND grid_row=? AND grid_col=?',
-      args: [h.id, row, col],
-    }));
-    if (existing) return res.status(409).json({ error: 'That cell already has a stall' });
+    const { blocks } = await occupancyBlocks(h.id);
+    if (collides(blocks, { row, col, span_rows, span_cols })) {
+      return res.status(409).json({ error: 'That space is already occupied' });
+    }
     const letter = String(h.name).match(/Hall\s+([A-Z])/i)?.[1]?.toUpperCase() || 'H';
-    const code = req.body?.code?.trim() || `${letter}-${String(row * h.grid_cols + col + 1).padStart(2, '0')}`;
-    const price = Number(req.body?.price) || 45000;
+    const code = req.body?.code?.trim() || `${letter}-${String(row + 1)}${String(col + 1).padStart(2, '0')}`;
+    const price = Number(req.body?.price) || (sizeInfo.display_size === 'large' || sizeInfo.display_size === 'xlarge' ? 75000 : 45000);
     const zone = req.body?.zone || 'Standard';
     const type = req.body?.type || 'Standard';
     const r = await db.execute({
-      sql: `INSERT INTO stalls (hall_id,code,zone,type,status,width,depth,area,price,grid_row,grid_col,description,facilities)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      sql: `INSERT INTO stalls (hall_id,code,zone,type,status,width,depth,area,price,grid_row,grid_col,span_cols,span_rows,display_size,description,facilities)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
-        h.id, code, zone, type, 'available', 3, 3, 9, price, row, col,
+        h.id, code, zone, type, 'available',
+        span_cols * 3, span_rows * 3, span_cols * span_rows * 9, price, row, col, span_cols, span_rows, sizeInfo.display_size,
         req.body?.description || `Stall in ${h.name}.`,
         JSON.stringify(['Electricity 15A', 'Wi‑Fi', 'Spotlights', 'Carpet']),
       ],
@@ -679,6 +844,83 @@ app.post('/api/admin/halls/:id/stalls', authRequired, requireRole('admin'), asyn
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not add stall' });
+  }
+});
+
+// AI: digitize attached floor plan image into interactive stalls + markers
+app.post('/api/admin/exhibitions/:slug/analyze-floor-plan', authRequired, requireRole('admin'), async (req, res) => {
+  try {
+    const e = one(await db.execute({ sql: 'SELECT * FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
+    if (!e) return res.status(404).json({ error: 'Exhibition not found' });
+    const imageUrl = String(req.body?.image_url || e.floor_plan_url || '').trim();
+    if (!imageUrl) return res.status(400).json({ error: 'Attach a floor plan image first (PNG/JPG)' });
+    if (/\.pdf($|\?)/i.test(imageUrl) || imageUrl.startsWith('data:application/pdf')) {
+      return res.status(400).json({ error: 'Upload a PNG or JPG of the floor plan (PDF vision not supported yet)' });
+    }
+
+    const analysis = await analyzeFloorPlanImage(imageUrl);
+    const replace = req.body?.replace_halls !== false;
+    if (replace) {
+      const existingHalls = rows(await db.execute({ sql: 'SELECT id FROM halls WHERE exhibition_id=?', args: [e.id] }));
+      for (const h of existingHalls) {
+        const stallIds = rows(await db.execute({ sql: 'SELECT id FROM stalls WHERE hall_id=?', args: [h.id] }));
+        for (const s of stallIds) {
+          await db.execute({ sql: 'DELETE FROM bookings WHERE stall_id=?', args: [s.id] });
+        }
+        await db.execute({ sql: 'DELETE FROM stalls WHERE hall_id=?', args: [h.id] });
+        await db.execute({ sql: 'DELETE FROM halls WHERE id=?', args: [h.id] });
+      }
+    }
+
+    const hallName = String(req.body?.hall_name || 'Hall A · AI map').trim() || 'Hall A · AI map';
+    const created = await createHallFromAiAnalysis(e.id, hallName, analysis);
+
+    // Keep attached map + prefer both modes for public page
+    const mode = ['attached', 'interactive', 'both'].includes(req.body?.floor_plan_mode)
+      ? req.body.floor_plan_mode
+      : 'both';
+    await db.execute({
+      sql: 'UPDATE exhibitions SET floor_plan_url=?, floor_plan_mode=? WHERE id=?',
+      args: [imageUrl, mode, e.id],
+    });
+
+    res.json({
+      ok: true,
+      source: analysis.source,
+      openai_configured: analysis.openai_configured,
+      notes: analysis.notes,
+      stalls_created: created.stalls_created,
+      markers_created: created.markers_created,
+      hall: created.hall,
+      analysis: {
+        grid_rows: analysis.grid_rows,
+        grid_cols: analysis.grid_cols,
+        entrance_label: analysis.entrance_label,
+        exit_label: analysis.exit_label,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'AI floor plan generation failed' });
+  }
+});
+
+// AI-assisted discovery: events in a city that are not already in the DB
+app.post('/api/admin/discover-events', authRequired, requireRole('admin'), async (req, res) => {
+  try {
+    const city = String(req.body?.city || '').trim();
+    if (!city) return res.status(400).json({ error: 'City is required' });
+    const existing = rows(await db.execute('SELECT name, city FROM exhibitions'));
+    const names = existing.map((e) => e.name);
+    const result = await discoverEvents(city, names);
+    // Extra safety: also exclude exact name+city already in DB
+    result.events = result.events.filter((ev) =>
+      !existing.some((e) => e.name.toLowerCase() === String(ev.name).toLowerCase() && e.city.toLowerCase() === String(ev.city).toLowerCase())
+    );
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Discovery failed' });
   }
 });
 
@@ -695,24 +937,70 @@ app.delete('/api/admin/stalls/:id', authRequired, requireRole('admin'), async (r
   }
 });
 
-// Update stall from admin floor-plan editor
+// Update stall from admin floor-plan editor (size, position / drag-drop, details)
 app.patch('/api/admin/stalls/:id', authRequired, requireRole('admin'), async (req, res) => {
-  const s = one(await db.execute({ sql: 'SELECT * FROM stalls WHERE id=?', args: [req.params.id] }));
-  if (!s) return res.status(404).json({ error: 'Stall not found' });
-  const allowed = ['available', 'reserved', 'booked', 'sponsor', 'blocked'];
-  const b = req.body || {};
-  const newStatus = allowed.includes(b.status) ? b.status : s.status;
-  const newPrice = b.price != null ? Number(b.price) : s.price;
-  const newCode = b.code != null ? String(b.code).trim() : s.code;
-  const newZone = b.zone != null ? String(b.zone).trim() : s.zone;
-  const newType = b.type != null ? String(b.type).trim() : s.type;
-  const newDesc = b.description !== undefined ? (b.description || null) : s.description;
-  await db.execute({
-    sql: 'UPDATE stalls SET status=?, price=?, code=?, zone=?, type=?, description=? WHERE id=?',
-    args: [newStatus, newPrice, newCode || s.code, newZone || s.zone, newType || s.type, newDesc, s.id],
-  });
-  const updated = one(await db.execute({ sql: 'SELECT * FROM stalls WHERE id=?', args: [s.id] }));
-  res.json(updated);
+  try {
+    const s = one(await db.execute({ sql: 'SELECT * FROM stalls WHERE id=?', args: [req.params.id] }));
+    if (!s) return res.status(404).json({ error: 'Stall not found' });
+    const allowed = ['available', 'reserved', 'booked', 'sponsor', 'blocked'];
+    const b = req.body || {};
+    const newStatus = allowed.includes(b.status) ? b.status : s.status;
+    const newPrice = b.price != null ? Number(b.price) : s.price;
+    const newCode = b.code != null ? String(b.code).trim() : s.code;
+    const newZone = b.zone != null ? String(b.zone).trim() : s.zone;
+    const newType = b.type != null ? String(b.type).trim() : s.type;
+    const newDesc = b.description !== undefined ? (b.description || null) : s.description;
+
+    let display_size = s.display_size || 'medium';
+    let span_cols = Number(s.span_cols) || 1;
+    let span_rows = Number(s.span_rows) || 1;
+    if (b.display_size != null) {
+      const info = spansForSize(b.display_size);
+      display_size = info.display_size;
+      span_cols = info.span_cols;
+      span_rows = info.span_rows;
+    }
+    if (b.span_cols != null) span_cols = Math.min(Math.max(Number(b.span_cols) || 1, 1), 4);
+    if (b.span_rows != null) span_rows = Math.min(Math.max(Number(b.span_rows) || 1, 1), 4);
+
+    let grid_row = b.grid_row != null ? Number(b.grid_row) : s.grid_row;
+    let grid_col = b.grid_col != null ? Number(b.grid_col) : s.grid_col;
+
+    const { hall, blocks } = await occupancyBlocks(s.hall_id, s.id);
+    if (!rectFitsLayout(hall.row_layout, grid_row, grid_col, span_rows, span_cols)) {
+      return res.status(400).json({ error: 'Stall does not fit in the layout at that position/size' });
+    }
+    if (collides(blocks, { row: grid_row, col: grid_col, span_rows, span_cols })) {
+      // Swap with a single 1×1 stall occupying the target origin (simple drag-swap)
+      const target = blocks.find((x) => x.kind === 'stall' && x.row === grid_row && x.col === grid_col
+        && (Number(x.span_cols) || 1) === 1 && (Number(x.span_rows) || 1) === 1
+        && span_cols === 1 && span_rows === 1);
+      if (target && (b.grid_row != null || b.grid_col != null)) {
+        await db.execute({
+          sql: 'UPDATE stalls SET grid_row=?, grid_col=? WHERE id=?',
+          args: [s.grid_row, s.grid_col, target.id],
+        });
+      } else {
+        return res.status(409).json({ error: 'Target space is occupied' });
+      }
+    }
+
+    await db.execute({
+      sql: `UPDATE stalls SET status=?, price=?, code=?, zone=?, type=?, description=?,
+            grid_row=?, grid_col=?, span_cols=?, span_rows=?, display_size=?,
+            width=?, depth=?, area=? WHERE id=?`,
+      args: [
+        newStatus, newPrice, newCode || s.code, newZone || s.zone, newType || s.type, newDesc,
+        grid_row, grid_col, span_cols, span_rows, display_size,
+        span_cols * 3, span_rows * 3, span_cols * span_rows * 9, s.id,
+      ],
+    });
+    const updated = one(await db.execute({ sql: 'SELECT * FROM stalls WHERE id=?', args: [s.id] }));
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not update stall' });
+  }
 });
 
 // ---------------- Serve built React app (production) ----------------
