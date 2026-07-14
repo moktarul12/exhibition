@@ -2,28 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, formatINR, formatDateShort } from '../api';
 import type { Exhibition, Stats } from '../types';
-import { Spinner } from '../components/ui';
+import { Spinner, SectionHeading } from '../components/ui';
+import ExhibitionCard from '../components/ExhibitionCard';
 import {
   Search, MapPin, Calendar, Users, Building, Ticket, Grid, ArrowRight, ChevronRight,
   Eye, Trending, Shield, Headset, Zap, Layout, Cog, Chip, Cup, Heart, Crane, Car, Bookmark,
+  Star,
 } from '../components/icons';
 import { useAuth } from '../auth';
 import { useCity } from '../city';
 
-const HERO_STATS = [
-  { icon: Ticket, value: '1,200+', label: 'Exhibitions', bg: 'bg-brand-50 text-brand-600' },
-  { icon: Users, value: '25K+', label: 'Exhibitors', bg: 'bg-grape-100 text-grape-600' },
-  { icon: Eye, value: '2M+', label: 'Visitors', bg: 'bg-emerald-50 text-emerald-600' },
-  { icon: Building, value: '500+', label: 'Venues', bg: 'bg-sky-50 text-sky-600' },
-];
 
-const TRUST = [
-  { icon: Users, label: 'Trusted by', value: '25K+', sub: 'Exhibitors' },
-  { icon: Building, label: 'Across', value: '350+', sub: 'Cities' },
-  { icon: Trending, label: 'Annual Footfall', value: '2M+', sub: 'Visitors' },
-  { icon: Shield, label: 'Success Rate', value: '98%', sub: 'Customer Satisfaction' },
-  { icon: Headset, label: 'Support', value: '24/7', sub: 'Expert Assistance' },
-];
+
+
 
 const INDUSTRIES = [
   { name: 'Industrial', icon: Cog, events: '125+ Events', bg: 'bg-brand-50 text-brand-600', q: 'Industrial Automation' },
@@ -51,8 +42,11 @@ const POPULAR = [
   { label: 'Pune', city: 'Pune' },
 ];
 
-// Smooth S-curve on the left edge of the hero image panel (matches ux.png)
-const HERO_PANEL_CLIP = 'path("M 0.18 0 C 0.04 0.22 0.04 0.48 0.14 0.5 C 0.04 0.52 0.04 0.78 0.18 1 L 1 1 L 1 0 Z")';
+const TABS = [
+  { key: 'live' as const, label: 'Live now' },
+  { key: 'upcoming' as const, label: 'Upcoming' },
+  { key: 'past' as const, label: 'Past' },
+];
 
 const BADGE_STYLES: Record<string, string> = {
   Featured: 'bg-brand-600 text-white',
@@ -70,10 +64,11 @@ export default function Home() {
   const { user } = useAuth();
   const { city, setCity } = useCity();
   const canBook = user?.role === 'exhibitor' || user?.role === 'admin';
-  const [, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [all, setAll] = useState<Exhibition[]>([]);
   const [filters, setFilters] = useState<{ industries: string[]; cities: string[] }>({ industries: [], cities: [] });
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<'live' | 'upcoming' | 'past'>('live');
 
   const [q, setQ] = useState('');
   const [loc, setLoc] = useState('');
@@ -99,6 +94,15 @@ export default function Home() {
     upcoming: inCity.filter((e) => e.status === 'upcoming').length,
     stalls: inCity.reduce((n, e) => n + (e.total_stalls ?? 0), 0),
   }), [inCity]);
+  const visible = useMemo(() => inCity.filter((e) => e.status === tab), [inCity, tab]);
+  const featuredInCity = useMemo(
+    () => inCity.filter((e) => e.tags?.some((t) => ['Trending', 'Most Booked', 'Recommended'].includes(t))).slice(0, 3),
+    [inCity],
+  );
+  const heroEvent = useMemo(
+    () => inCity.find((e) => e.status === 'live') || inCity.find((e) => e.status === 'upcoming') || inCity[0],
+    [inCity],
+  );
 
   const doSearch = () => {
     const p = new URLSearchParams();
@@ -117,13 +121,8 @@ export default function Home() {
         {/* Soft pink hero background */}
         <div className="absolute inset-0 -z-20" style={{ background: 'linear-gradient(180deg,#fdf2f8 0%, #f5f3ff 55%, #ffffff 100%)' }} />
 
-        {/* Full-bleed image panel — desktop (right side with S-curve) */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 -z-10 hidden w-[54%] lg:block">
-          <HeroImagePanel />
-        </div>
-
         <div className="container-px relative z-10 grid items-center gap-10 pb-16 pt-10 lg:grid-cols-2 lg:gap-8 lg:pb-24 lg:pt-14">
-          {/* Left — city-aware copy + inline search (like attached screenshot) */}
+          {/* Left — city-aware copy + inline search */}
           <div className="max-w-xl">
             <h1 className="font-display text-[2.45rem] font-extrabold leading-[1.1] text-ink-900 sm:text-5xl lg:text-[3.2rem]">
               {canBook ? (
@@ -165,10 +164,8 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Mobile image panel */}
-          <div className="lg:hidden">
-            <HeroImagePanel mobile />
-          </div>
+          {/* Right — layered exhibition collage */}
+          <HeroVisual heroEvent={heroEvent} secondary={inCity.filter((e) => e.id !== heroEvent?.id).slice(0, 2)} cityStats={cityStats} />
         </div>
 
         {/* Bottom curve — soft arc into white (ux.png section transition) */}
@@ -211,22 +208,68 @@ export default function Home() {
           </div>
         </div>
 
-      {/* ---------------- Trust band ---------------- */}
-      <section className="container-px mt-14">
-        <div className="grid gap-6 rounded-3xl px-6 py-8 text-white sm:grid-cols-2 lg:grid-cols-5 lg:gap-2"
-          style={{ backgroundImage: 'linear-gradient(120deg,#171436 0%,#241a4d 55%,#3a1c56 100%)' }}>
-          {TRUST.map((t, i) => (
-            <div key={t.label} className={`flex items-center gap-3.5 ${i < TRUST.length - 1 ? 'lg:border-r lg:border-white/10' : ''}`}>
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/10 text-white"><t.icon width={22} /></span>
-              <div>
-                <div className="text-[11px] font-medium uppercase tracking-wide text-white/50">{t.label}</div>
-                <div className="font-display text-2xl font-extrabold leading-tight">{t.value}</div>
-                <div className="text-xs text-white/60">{t.sub}</div>
-              </div>
-            </div>
+
+      {/* ---------------- Live stats band ---------------- */}
+      {stats && (
+        <section className="container-px mt-10">
+          <div className="grid gap-4 rounded-2xl border border-ink-100 bg-white p-5 shadow-card sm:grid-cols-2 lg:grid-cols-4">
+            <StatPill label="Live expos" value={stats.live} accent="text-emerald-600" />
+            <StatPill label="Upcoming" value={stats.upcoming} accent="text-brand-600" />
+            <StatPill label="Exhibitors" value={stats.companies.toLocaleString('en-IN')} accent="text-grape-600" />
+            <StatPill label="Bookings" value={stats.bookings.toLocaleString('en-IN')} accent="text-sky-600" />
+          </div>
+        </section>
+      )}
+
+      {/* ---------------- Browse exhibitions in city ---------------- */}
+      <section className="container-px mt-16">
+        <SectionHeading
+          title={`Browse exhibitions in ${city}`}
+          subtitle={canBook ? 'Pick a live expo and book your stall in minutes.' : 'Explore live, upcoming and past trade fairs near you.'}
+        />
+        <div className="mt-6 flex flex-wrap gap-2">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${tab === t.key ? 'bg-brand-600 text-white shadow-soft' : 'bg-ink-50 text-ink-600 hover:bg-brand-50 hover:text-brand-700'}`}
+            >
+              {t.label}
+              <span className="ml-1.5 text-xs opacity-80">
+                ({t.key === 'live' ? cityStats.live : t.key === 'upcoming' ? cityStats.upcoming : inCity.filter((e) => e.status === 'past').length})
+              </span>
+            </button>
           ))}
         </div>
+        {visible.length > 0 ? (
+          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {visible.map((e) => <ExhibitionCard key={e.id} e={e} />)}
+          </div>
+        ) : (
+          <div className="mt-8 rounded-2xl border border-dashed border-ink-200 bg-ink-50 px-6 py-12 text-center">
+            <p className="font-display text-lg font-bold text-ink-800">No {tab === 'live' ? 'live' : tab} exhibitions in {city} right now</p>
+            <p className="mt-2 text-sm text-ink-500">Try another tab or switch city from the navbar.</p>
+            <Link to="/exhibitions" className="btn-primary mt-5 inline-flex px-5 py-2.5">Browse all exhibitions</Link>
+          </div>
+        )}
+        {visible.length > 0 && (
+          <div className="mt-8 text-center">
+            <Link to={`/exhibitions?city=${encodeURIComponent(city)}&status=${tab}`} className="link-brand inline-flex items-center gap-1 text-sm font-semibold">
+              View all {tab} in {city} <ArrowRight width={15} />
+            </Link>
+          </div>
+        )}
       </section>
+
+      {/* ---------------- Featured in city ---------------- */}
+      {featuredInCity.length > 0 && (
+        <section className="container-px mt-16">
+          <SectionHeading title={`Featured in ${city}`} subtitle="Hand-picked expos trending with exhibitors and visitors." />
+          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {featuredInCity.map((e) => <ExhibitionCard key={e.id} e={e} />)}
+          </div>
+        </section>
+      )}
 
       {/* ---------------- Browse by Industry ---------------- */}
       <section className="container-px mt-16">
@@ -303,51 +346,147 @@ export default function Home() {
   );
 }
 
-function HeroImagePanel({ mobile = false }: { mobile?: boolean }) {
-  const clip = mobile ? undefined : HERO_PANEL_CLIP;
+const HERO_SLIDES = [
+  {
+    src: '/hero-expo-hall.png',
+    alt: 'Live exhibition hall with stalls',
+    label: 'Live Exhibition',
+    caption: 'Explore floor plans',
+    fit: 'object-cover' as const,
+  },
+  {
+    src: '/hero-stall-booth.png',
+    alt: 'Premium exhibition stall',
+    label: 'Premium Stall',
+    caption: 'Book your spot',
+    fit: 'object-cover' as const,
+  },
+  {
+    src: '/hero-booth.png',
+    alt: 'ExpoMela exhibition booth',
+    label: 'ExpoMela',
+    caption: 'Showcase your brand',
+    fit: 'object-contain bg-white' as const,
+  },
+];
+
+function HeroVisual({
+  heroEvent,
+  secondary,
+  cityStats,
+}: {
+  heroEvent?: Exhibition;
+  secondary: Exhibition[];
+  cityStats: { live: number; upcoming: number; stalls: number };
+}) {
+  const [slide, setSlide] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setSlide((i) => (i + 1) % HERO_SLIDES.length);
+    }, 4200);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const current = HERO_SLIDES[slide];
 
   return (
-    <div className={`relative ${mobile ? 'mx-auto max-w-lg' : 'h-full min-h-[520px]'}`}>
-      {/* Navy / indigo backdrop behind image */}
+    <div className="relative mx-auto w-full max-w-[560px] pb-14 lg:max-w-none lg:justify-self-end lg:pb-10">
+      {/* Soft concentric rings */}
+      <div className="pointer-events-none absolute left-1/2 top-[46%] z-0 h-[118%] w-[118%] -translate-x-1/2 -translate-y-1/2">
+        <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, rgba(252,232,239,0.95) 0%, rgba(243,232,255,0.35) 45%, transparent 70%)' }} />
+        <div className="absolute inset-[10%] rounded-full border-[32px] border-brand-100/60" />
+        <div className="absolute inset-[26%] rounded-full border-[24px] border-grape-100/50" />
+      </div>
       <div
-        className={`absolute inset-0 ${mobile ? 'rounded-[1.75rem]' : ''}`}
-        style={{
-          clipPath: clip,
-          background: 'linear-gradient(145deg, #141230 0%, #1e1b4b 45%, #312e81 100%)',
-        }}
+        className="pointer-events-none absolute right-1 top-4 z-0 h-24 w-24 opacity-40"
+        style={{ backgroundImage: 'radial-gradient(#9ca3af 1.2px, transparent 1.2px)', backgroundSize: '9px 9px' }}
       />
 
-      {/* Soft cyan glow at the S-curve junction */}
-      {!mobile && (
-        <div className="pointer-events-none absolute -left-8 top-[38%] h-52 w-52 rounded-full bg-cyan-400/25 blur-3xl" />
+      {/* Main hero carousel — hall → premium stall → ExpoMela */}
+      <div className="relative z-10 overflow-hidden rounded-[1.75rem] shadow-soft ring-1 ring-black/5">
+        <div className="relative h-[280px] sm:h-[340px] lg:h-[400px]">
+          {HERO_SLIDES.map((s, i) => (
+            <img
+              key={s.src}
+              src={s.src}
+              alt={s.alt}
+              className={`absolute inset-0 h-full w-full transition-all duration-700 ease-out ${s.fit} ${
+                i === slide ? 'scale-100 opacity-100' : 'scale-105 opacity-0'
+              }`}
+            />
+          ))}
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-tr from-brand-700/30 via-transparent to-grape-600/10 pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950/70 via-ink-950/20 to-transparent p-4 sm:p-5">
+          {slide === 0 && heroEvent ? (
+            <Link to={`/exhibitions/${heroEvent.slug}`} className="group block">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-700 shadow-sm">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand" />
+                {heroEvent.status === 'live' ? 'Live now' : heroEvent.status === 'upcoming' ? 'Upcoming' : 'Featured'}
+              </span>
+              <p className="mt-2 line-clamp-1 font-display text-base font-bold text-white group-hover:underline sm:text-lg">{heroEvent.name}</p>
+              <p className="flex items-center gap-1 text-xs text-white/80"><MapPin width={12} /> {heroEvent.venue}</p>
+            </Link>
+          ) : (
+            <div className="transition-opacity duration-500">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-700 shadow-sm">
+                {current.label}
+              </span>
+              <p className="mt-2 font-display text-base font-bold text-white sm:text-lg">{current.caption}</p>
+            </div>
+          )}
+          <div className="mt-3 flex items-center gap-1.5">
+            {HERO_SLIDES.map((s, i) => (
+              <button
+                key={s.src}
+                type="button"
+                aria-label={`Show ${s.label}`}
+                onClick={() => setSlide(i)}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === slide ? 'w-6 bg-white' : 'w-1.5 bg-white/45 hover:bg-white/70'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Floating live count chip */}
+      <div className="absolute -top-3 right-4 z-20 flex items-center gap-2 rounded-full border border-white bg-white/95 px-3 py-1.5 shadow-soft backdrop-blur sm:right-6">
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-grad text-white"><Star width={12} style={{ fill: '#fff' }} /></span>
+        <div className="leading-tight">
+          <div className="text-[10px] font-medium text-ink-400">In this city</div>
+          <div className="text-xs font-extrabold text-ink-900">{cityStats.live} live · {cityStats.upcoming} soon</div>
+        </div>
+      </div>
+
+      {/* Mini exhibition thumbs */}
+      {secondary.length > 0 && (
+        <div className="absolute -left-2 top-10 z-20 hidden flex-col gap-2 sm:flex lg:-left-4">
+          {secondary.map((e, i) => (
+            <Link
+              key={e.id}
+              to={`/exhibitions/${e.slug}`}
+              className={`overflow-hidden rounded-xl border-2 border-white shadow-soft ${i === 0 ? 'animate-floaty' : ''}`}
+              style={i === 1 ? { animationDelay: '1.5s' } : undefined}
+            >
+              <img src={e.banner} alt={e.name} className="h-16 w-24 object-cover" />
+            </Link>
+          ))}
+        </div>
       )}
 
-      {/* Exhibition hall photo */}
-      <div className={`absolute inset-0 overflow-hidden ${mobile ? 'rounded-[1.75rem] shadow-soft' : ''}`} style={{ clipPath: clip }}>
-        <img
-          src="/hero-expo-hall.png"
-          alt="Exhibition hall"
-          className={`h-full w-full object-cover object-center ${mobile ? 'aspect-[4/3]' : 'min-h-[520px]'}`}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink-950/30 via-transparent to-transparent" />
-      </div>
+  
+    </div>
+  );
+}
 
-      {/* Stats bar — sits on image bottom edge */}
-      <div
-        className={`absolute z-10 grid grid-cols-2 gap-3 rounded-2xl border border-white/60 bg-white/95 p-4 shadow-soft backdrop-blur-sm sm:grid-cols-4 ${mobile ? '-bottom-8 left-2 right-2' : 'bottom-8 left-6 right-6 lg:left-10 lg:right-10'}`}
-      >
-        {HERO_STATS.map((s) => (
-          <div key={s.label} className="flex items-center gap-2.5">
-            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${s.bg}`}><s.icon width={19} /></span>
-            <div className="min-w-0">
-              <div className="font-display text-base font-extrabold text-ink-900 sm:text-lg">{s.value}</div>
-              <div className="truncate text-[10px] font-medium text-ink-400 sm:text-[11px]">{s.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {mobile && <div className="h-12" />}
+function StatPill({ label, value, accent }: { label: string; value: string | number; accent: string }) {
+  return (
+    <div className="text-center sm:text-left">
+      <div className={`font-display text-2xl font-extrabold ${accent}`}>{value}</div>
+      <div className="text-sm text-ink-500">{label}</div>
     </div>
   );
 }
