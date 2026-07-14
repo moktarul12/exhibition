@@ -1,6 +1,6 @@
 import { db } from './db.js';
 
-// Full schema for ExpoHub. Uses libSQL (Turso) — SQLite dialect.
+// Full schema for Expo Mela. Uses libSQL (Turso) — SQLite dialect.
 export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -180,6 +180,32 @@ export const SCHEMA_STATEMENTS = [
     FOREIGN KEY (exhibition_id) REFERENCES exhibitions(id),
     FOREIGN KEY (from_user_id) REFERENCES users(id)
   )`,
+
+  `CREATE TABLE IF NOT EXISTS exhibition_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exhibition_id INTEGER NOT NULL,
+    user_id INTEGER,
+    author_name TEXT NOT NULL,
+    author_city TEXT,
+    body TEXT NOT NULL,
+    rating INTEGER DEFAULT 5,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (exhibition_id) REFERENCES exhibitions(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS exhibition_media (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    exhibition_id INTEGER NOT NULL,
+    user_id INTEGER,
+    author_name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'photo', -- photo | video
+    url TEXT NOT NULL,
+    caption TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (exhibition_id) REFERENCES exhibitions(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`,
 ];
 
 export async function initSchema() {
@@ -190,6 +216,7 @@ export async function initSchema() {
 
 export async function dropAll() {
   const tables = [
+    'exhibition_media', 'exhibition_comments',
     'messages', 'notifications', 'seminars', 'exhibitors', 'bookings', 'stalls',
     'halls', 'exhibitions', 'organizers', 'companies', 'users',
   ];

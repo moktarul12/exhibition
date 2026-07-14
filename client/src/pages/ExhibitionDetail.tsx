@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, formatDate, formatINR, daysUntil, dayOfEvent } from '../api';
-import type { Exhibition, Hall, Organizer, Seminar, Company } from '../types';
+import type { Exhibition, Hall, Organizer, Seminar, Company, ExhibitionComment, ExhibitionMedia } from '../types';
 import { StatusBadge, Spinner } from '../components/ui';
 import FloorPlan from '../components/FloorPlan';
 import { MapPin, Calendar, Users, Grid, Ticket, Building, Clock, Globe, Phone, Mail, ArrowRight, Star } from '../components/icons';
@@ -10,7 +10,7 @@ import { toEmbedUrl, mediaKind } from '../media';
 
 type Detail = Exhibition & { organizer: Organizer; halls: Hall[]; seminars: Seminar[]; exhibitors: (Company & { stall_code: string; hall_name: string })[] };
 
-const TABS = ['Overview', 'Location', 'Video', 'Floor plan', 'Exhibitors', 'Seminars', 'Gallery', 'FAQs'] as const;
+const TABS = ['Overview', 'Location', 'Video', 'Floor plan', 'Exhibitors', 'Seminars', 'Gallery', 'Comments', 'FAQs'] as const;
 type TabKey = (typeof TABS)[number];
 
 function mapsEmbedUrl(lat?: number, lng?: number, query?: string) {
@@ -30,16 +30,33 @@ export default function ExhibitionDetail() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>('Overview');
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [comments, setComments] = useState<ExhibitionComment[]>([]);
+  const [media, setMedia] = useState<ExhibitionMedia[]>([]);
+
+  const reloadSide = () => {
+    if (!slug) return;
+    api.get(`/exhibitions/${slug}/comments`).then((r) => setComments(r.data)).catch(() => setComments([]));
+    api.get(`/exhibitions/${slug}/media`).then((r) => setMedia(r.data)).catch(() => setMedia([]));
+  };
 
   useEffect(() => {
     setLoading(true);
     api.get(`/exhibitions/${slug}`).then((r) => setData(r.data)).finally(() => setLoading(false));
+    reloadSide();
     const h = window.location.hash.replace('#', '');
     if (h === 'floor-plan') setTab('Floor plan');
     if (h === 'location') setTab('Location');
     if (h === 'video') setTab('Video');
     if (h === 'gallery') setTab('Gallery');
+    if (h === 'comments') setTab('Comments');
   }, [slug]);
+
+  const onMediaAdded = (item: ExhibitionMedia) => {
+    setMedia((prev) => [item, ...prev]);
+    if (item.kind === 'photo' && data) {
+      setData({ ...data, gallery: [item.url, ...(data.gallery || [])] });
+    }
+  };
 
   if (loading) return <Spinner label="Loading exhibition…" />;
   if (!data) return <div className="container-px py-24 text-center text-ink-500">Exhibition not found.</div>;
@@ -81,7 +98,6 @@ export default function ExhibitionDetail() {
                 </div>
               </div>
 
-              {/* Action card */}
               <div className="card p-5 shadow-soft">
                 <div className="flex items-end justify-between">
                   <div>
@@ -109,7 +125,6 @@ export default function ExhibitionDetail() {
         </div>
       </div>
 
-      {/* ---------------- Stat row ---------------- */}
       <div className="container-px">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <MiniStat icon={<Grid width={18} />} label="Total stalls" value={data.total_stalls ?? 0} />
@@ -119,7 +134,6 @@ export default function ExhibitionDetail() {
         </div>
       </div>
 
-      {/* ---------------- Tabs ---------------- */}
       <div className="sticky top-16 z-30 mt-8 border-y border-ink-100 bg-[var(--paper)]/90 backdrop-blur">
         <div className="container-px">
           <div className="no-scrollbar flex gap-1 overflow-x-auto">
@@ -127,6 +141,9 @@ export default function ExhibitionDetail() {
               <button key={t} onClick={() => setTab(t)}
                 className={`relative whitespace-nowrap px-4 py-4 text-sm font-semibold transition-colors ${tab === t ? 'text-brand-700' : 'text-ink-500 hover:text-ink-900'}`}>
                 {t}
+                {t === 'Comments' && comments.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">{comments.length}</span>
+                )}
                 {tab === t && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-full bg-brand" />}
               </button>
             ))}
@@ -135,9 +152,9 @@ export default function ExhibitionDetail() {
       </div>
 
       <div className="container-px py-10">
-        {tab === 'Overview' && <Overview data={data} mapSrc={mapSrc} onFloor={goFloor} onTab={setTab} onPhoto={setLightbox} canBook={canBook} />}
+        {tab === 'Overview' && <Overview data={data} mapSrc={mapSrc} onFloor={goFloor} onTab={setTab} onPhoto={setLightbox} canBook={canBook} commentCount={comments.length} />}
         {tab === 'Location' && <Location data={data} mapSrc={mapSrc} mapLink={mapLink} />}
-        {tab === 'Video' && <Video data={data} />}
+        {tab === 'Video' && <Video data={data} media={media} slug={data.slug} defaultName={user?.name} onAdded={onMediaAdded} />}
         {tab === 'Floor plan' && (
           data.status === 'past'
             ? <div className="card py-16 text-center text-ink-500">This exhibition has concluded. The final stall layout is archived.</div>
@@ -145,7 +162,8 @@ export default function ExhibitionDetail() {
         )}
         {tab === 'Exhibitors' && <Exhibitors data={data} />}
         {tab === 'Seminars' && <Seminars data={data} />}
-        {tab === 'Gallery' && <Gallery data={data} onPhoto={setLightbox} />}
+        {tab === 'Gallery' && <Gallery data={data} media={media} slug={data.slug} defaultName={user?.name} onPhoto={setLightbox} onAdded={onMediaAdded} />}
+        {tab === 'Comments' && <Comments comments={comments} slug={data.slug} defaultName={user?.name} onPosted={(c) => setComments((prev) => [c, ...prev])} />}
         {tab === 'FAQs' && <FAQs data={data} />}
       </div>
 
@@ -161,7 +179,7 @@ export default function ExhibitionDetail() {
 
 /* ---------------- Sections ---------------- */
 
-function Overview({ data, mapSrc, onFloor, onTab, onPhoto, canBook }: { data: Detail; mapSrc: string; onFloor: () => void; onTab: (t: TabKey) => void; onPhoto: (s: string) => void; canBook: boolean }) {
+function Overview({ data, mapSrc, onFloor, onTab, onPhoto, canBook, commentCount }: { data: Detail; mapSrc: string; onFloor: () => void; onTab: (t: TabKey) => void; onPhoto: (s: string) => void; canBook: boolean; commentCount: number }) {
   return (
     <div className="grid gap-8 lg:grid-cols-3">
       <div className="space-y-8 lg:col-span-2">
@@ -194,7 +212,6 @@ function Overview({ data, mapSrc, onFloor, onTab, onPhoto, canBook }: { data: De
           </div>
         </section>
 
-        {/* Preview: map + video */}
         <section className="grid gap-4 sm:grid-cols-2">
           <button onClick={() => onTab('Location')} className="card overflow-hidden text-left transition-shadow hover:shadow-soft">
             <div className="h-40 overflow-hidden bg-ink-100"><iframe title="Map preview" src={mapSrc} className="pointer-events-none h-full w-full border-0" loading="lazy" /></div>
@@ -225,9 +242,16 @@ function Overview({ data, mapSrc, onFloor, onTab, onPhoto, canBook }: { data: De
             </div>
           </section>
         )}
+
+        <button onClick={() => onTab('Comments')} className="card flex w-full items-center justify-between p-4 text-left transition-shadow hover:shadow-soft">
+          <div>
+            <div className="font-semibold text-ink-900">Visitor comments</div>
+            <div className="text-sm text-ink-500">{commentCount} people shared feedback about this expo</div>
+          </div>
+          <span className="text-sm font-semibold text-brand-600">Read →</span>
+        </button>
       </div>
 
-      {/* Sidebar */}
       <aside className="space-y-4">
         <div className="card p-5">
           <h3 className="mb-4 font-display text-sm font-bold uppercase tracking-wide text-ink-400">Event details</h3>
@@ -283,35 +307,138 @@ function Location({ data, mapSrc, mapLink }: { data: Detail; mapSrc: string; map
   );
 }
 
-function Video({ data }: { data: Detail }) {
+function AddMediaForm({
+  slug,
+  defaultName,
+  defaultKind,
+  onAdded,
+}: {
+  slug: string;
+  defaultName?: string;
+  defaultKind: 'video' | 'photo';
+  onAdded: (m: ExhibitionMedia) => void;
+}) {
+  const [kind, setKind] = useState<'video' | 'photo'>(defaultKind);
+  const [name, setName] = useState(defaultName || '');
+  const [url, setUrl] = useState('');
+  const [caption, setCaption] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [ok, setOk] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setOk(false);
+    setBusy(true);
+    try {
+      const r = await api.post(`/exhibitions/${slug}/media`, { author_name: name, kind, url, caption });
+      onAdded(r.data);
+      setUrl('');
+      setCaption('');
+      setOk(true);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg || 'Could not add media');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="card space-y-3 p-5">
+      <div>
+        <h3 className="font-display text-base font-bold text-ink-900">Add video link or photo</h3>
+        <p className="text-sm text-ink-500">Paste a YouTube URL or a direct photo image URL for this exhibition.</p>
+      </div>
+      <div className="flex gap-2">
+        {(['video', 'photo'] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setKind(k)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${kind === k ? 'bg-brand-600 text-white' : 'bg-ink-50 text-ink-600'}`}
+          >
+            {k}
+          </button>
+        ))}
+      </div>
+      <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Your name" className="w-full rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100" />
+      <input
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        required
+        placeholder={kind === 'video' ? 'https://youtube.com/watch?v=…' : 'https://…/photo.jpg'}
+        className="w-full rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100"
+      />
+      <input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Caption (optional)" className="w-full rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100" />
+      {error && <p className="text-sm text-brand-700">{error}</p>}
+      {ok && <p className="text-sm text-emerald-600">Added — thanks for sharing!</p>}
+      <button type="submit" disabled={busy} className="btn-primary">{busy ? 'Saving…' : `Add ${kind}`}</button>
+    </form>
+  );
+}
+
+function Video({ data, media, slug, defaultName, onAdded }: { data: Detail; media: ExhibitionMedia[]; slug: string; defaultName?: string; onAdded: (m: ExhibitionMedia) => void }) {
   const videoSrc = toEmbedUrl(data.youtube_url);
   const reelSrc = toEmbedUrl(data.reel_url);
+  const communityVideos = media.filter((m) => m.kind === 'video');
   return (
-    <div className="mx-auto max-w-5xl">
-      <h2 className="mb-1 font-display text-xl font-extrabold text-ink-900">Exhibition video & reels</h2>
-      <p className="mb-5 text-sm text-ink-500">A short walkthrough of the venue and the exhibition experience.</p>
-      {!videoSrc && !reelSrc ? (
-        <div className="card py-16 text-center text-ink-500">Video coming soon.</div>
-      ) : (
-        <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
-          {videoSrc && (
-            <div>
-              <div className="mb-2 text-sm font-semibold text-ink-700">Highlights video</div>
-              <div className="aspect-video overflow-hidden rounded-3xl bg-ink-950 shadow-soft">
-                <iframe title={`${data.name} video`} src={videoSrc} className="h-full w-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+    <div className="mx-auto max-w-5xl space-y-8">
+      <div>
+        <h2 className="mb-1 font-display text-xl font-extrabold text-ink-900">Exhibition video & reels</h2>
+        <p className="mb-5 text-sm text-ink-500">Official highlights plus community video links shared for this expo.</p>
+        {!videoSrc && !reelSrc && communityVideos.length === 0 ? (
+          <div className="card py-16 text-center text-ink-500">No videos yet — add the first link below.</div>
+        ) : (
+          <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
+            {videoSrc && (
+              <div>
+                <div className="mb-2 text-sm font-semibold text-ink-700">Highlights video</div>
+                <div className="aspect-video overflow-hidden rounded-3xl bg-ink-950 shadow-soft">
+                  <iframe title={`${data.name} video`} src={videoSrc} className="h-full w-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+                </div>
               </div>
-            </div>
-          )}
-          {reelSrc && (
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink-700">Reel <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-bold uppercase text-brand-600">{mediaKind(data.reel_url) === 'instagram' ? 'Instagram' : 'Short'}</span></div>
-              <div className="mx-auto aspect-[9/16] max-h-[560px] w-full max-w-[320px] overflow-hidden rounded-3xl bg-ink-950 shadow-soft">
-                <iframe title={`${data.name} reel`} src={reelSrc} className="h-full w-full border-0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowFullScreen scrolling="no" />
+            )}
+            {reelSrc && (
+              <div>
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink-700">Reel <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-bold uppercase text-brand-600">{mediaKind(data.reel_url) === 'instagram' ? 'Instagram' : 'Short'}</span></div>
+                <div className="mx-auto aspect-[9/16] max-h-[560px] w-full max-w-[320px] overflow-hidden rounded-3xl bg-ink-950 shadow-soft">
+                  <iframe title={`${data.name} reel`} src={reelSrc} className="h-full w-full border-0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowFullScreen scrolling="no" />
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
+      </div>
+
+      {communityVideos.length > 0 && (
+        <div>
+          <h3 className="mb-3 font-display text-lg font-bold text-ink-900">Community videos</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {communityVideos.map((m) => {
+              const embed = toEmbedUrl(m.url);
+              return (
+                <div key={m.id} className="card overflow-hidden">
+                  {embed ? (
+                    <div className="aspect-video bg-ink-950">
+                      <iframe title={m.caption || 'Community video'} src={embed} className="h-full w-full border-0" allowFullScreen />
+                    </div>
+                  ) : (
+                    <a href={m.url} target="_blank" rel="noreferrer" className="block truncate p-4 text-sm font-medium text-brand-600">{m.url}</a>
+                  )}
+                  <div className="p-3">
+                    <div className="text-sm font-semibold text-ink-900">{m.caption || 'Shared video'}</div>
+                    <div className="text-xs text-ink-400">by {m.author_name}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
+
+      <AddMediaForm slug={slug} defaultName={defaultName} defaultKind="video" onAdded={onAdded} />
     </div>
   );
 }
@@ -358,15 +485,137 @@ function Seminars({ data }: { data: Detail }) {
   );
 }
 
-function Gallery({ data, onPhoto }: { data: Detail; onPhoto: (s: string) => void }) {
+function Gallery({
+  data,
+  media,
+  slug,
+  defaultName,
+  onPhoto,
+  onAdded,
+}: {
+  data: Detail;
+  media: ExhibitionMedia[];
+  slug: string;
+  defaultName?: string;
+  onPhoto: (s: string) => void;
+  onAdded: (m: ExhibitionMedia) => void;
+}) {
+  const communityPhotos = media.filter((m) => m.kind === 'photo');
   return (
-    <div>
-      <h2 className="mb-5 font-display text-xl font-extrabold text-ink-900">Pictures from the exhibition</h2>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-        {data.gallery.map((g, i) => (
-          <button key={i} onClick={() => onPhoto(g)} className="group overflow-hidden rounded-2xl">
-            <img src={g} alt="" className="h-44 w-full object-cover transition-transform duration-300 group-hover:scale-105 md:h-52" />
-          </button>
+    <div className="space-y-8">
+      <div>
+        <h2 className="mb-5 font-display text-xl font-extrabold text-ink-900">Pictures from the exhibition</h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+          {data.gallery.map((g, i) => (
+            <button key={i} onClick={() => onPhoto(g)} className="group overflow-hidden rounded-2xl">
+              <img src={g} alt="" className="h-44 w-full object-cover transition-transform duration-300 group-hover:scale-105 md:h-52" />
+            </button>
+          ))}
+        </div>
+      </div>
+      {communityPhotos.length > 0 && (
+        <div>
+          <h3 className="mb-3 font-display text-lg font-bold text-ink-900">Shared by visitors</h3>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {communityPhotos.map((m) => (
+              <button key={m.id} onClick={() => onPhoto(m.url)} className="overflow-hidden rounded-2xl text-left">
+                <img src={m.url} alt={m.caption || ''} className="h-40 w-full object-cover" />
+                <div className="bg-ink-50 px-2.5 py-2">
+                  <div className="truncate text-xs font-semibold text-ink-800">{m.caption || 'Photo'}</div>
+                  <div className="truncate text-[11px] text-ink-400">by {m.author_name}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <AddMediaForm slug={slug} defaultName={defaultName} defaultKind="photo" onAdded={onAdded} />
+    </div>
+  );
+}
+
+function Comments({
+  comments,
+  slug,
+  defaultName,
+  onPosted,
+}: {
+  comments: ExhibitionComment[];
+  slug: string;
+  defaultName?: string;
+  onPosted: (c: ExhibitionComment) => void;
+}) {
+  const [name, setName] = useState(defaultName || '');
+  const [city, setCity] = useState('Bengaluru');
+  const [body, setBody] = useState('');
+  const [rating, setRating] = useState(5);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      const r = await api.post(`/exhibitions/${slug}/comments`, { author_name: name, author_city: city, body, rating });
+      onPosted(r.data);
+      setBody('');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setError(msg || 'Could not post comment');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div>
+        <h2 className="font-display text-xl font-extrabold text-ink-900">Comments <span className="text-ink-300">({comments.length})</span></h2>
+        <p className="mt-1 text-sm text-ink-500">What visitors and exhibitors are saying about this exhibition.</p>
+      </div>
+
+      <form onSubmit={submit} className="card space-y-3 p-5">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Your name" className="rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100" />
+          <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100" />
+        </div>
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button key={n} type="button" onClick={() => setRating(n)} aria-label={`${n} stars`}>
+              <Star width={18} style={{ color: n <= rating ? '#fbbf24' : '#d1d5db', fill: n <= rating ? '#fbbf24' : 'transparent' }} />
+            </button>
+          ))}
+          <span className="ml-2 text-xs text-ink-400">{rating}/5</span>
+        </div>
+        <textarea value={body} onChange={(e) => setBody(e.target.value)} required rows={3} placeholder="Share your experience…" className="w-full rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100" />
+        {error && <p className="text-sm text-brand-700">{error}</p>}
+        <button type="submit" disabled={busy} className="btn-primary">{busy ? 'Posting…' : 'Post comment'}</button>
+      </form>
+
+      <div className="space-y-3">
+        {comments.length === 0 ? (
+          <div className="card py-12 text-center text-ink-500">No comments yet — be the first.</div>
+        ) : comments.map((c) => (
+          <div key={c.id} className="card p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-700">
+                  {c.author_name.slice(0, 1).toUpperCase()}
+                </div>
+                <div>
+                  <div className="font-semibold text-ink-900">{c.author_name}</div>
+                  <div className="text-xs text-ink-400">{c.author_city || 'India'} · {formatDate(c.created_at.slice(0, 10))}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} width={12} style={{ color: i < c.rating ? '#fbbf24' : '#e5e7eb', fill: i < c.rating ? '#fbbf24' : 'transparent' }} />
+                ))}
+              </div>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-ink-600">{c.body}</p>
+          </div>
         ))}
       </div>
     </div>

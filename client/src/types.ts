@@ -147,6 +147,28 @@ export interface Seminar {
   hall: string;
 }
 
+export interface ExhibitionComment {
+  id: number;
+  exhibition_id: number;
+  user_id?: number | null;
+  author_name: string;
+  author_city?: string | null;
+  body: string;
+  rating: number;
+  created_at: string;
+}
+
+export interface ExhibitionMedia {
+  id: number;
+  exhibition_id: number;
+  user_id?: number | null;
+  author_name: string;
+  kind: 'photo' | 'video';
+  url: string;
+  caption?: string | null;
+  created_at: string;
+}
+
 export interface Stats {
   live: number;
   upcoming: number;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, formatINR, formatDateShort } from '../api';
-import type { Exhibition, Stats } from '../types';
+import type { Exhibition } from '../types';
 import { Spinner, SectionHeading } from '../components/ui';
 import ExhibitionCard from '../components/ExhibitionCard';
 import {
@@ -42,12 +42,6 @@ const POPULAR = [
   { label: 'Pune', city: 'Pune' },
 ];
 
-const TABS = [
-  { key: 'live' as const, label: 'Live now' },
-  { key: 'upcoming' as const, label: 'Upcoming' },
-  { key: 'past' as const, label: 'Past' },
-];
-
 const BADGE_STYLES: Record<string, string> = {
   Featured: 'bg-brand-600 text-white',
   Trending: 'bg-emerald-500 text-white',
@@ -64,12 +58,9 @@ export default function Home() {
   const { user } = useAuth();
   const { city, setCity } = useCity();
   const canBook = user?.role === 'exhibitor' || user?.role === 'admin';
-  const [stats, setStats] = useState<Stats | null>(null);
   const [all, setAll] = useState<Exhibition[]>([]);
   const [filters, setFilters] = useState<{ industries: string[]; cities: string[] }>({ industries: [], cities: [] });
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'live' | 'upcoming' | 'past'>('live');
-
   const [q, setQ] = useState('');
   const [loc, setLoc] = useState('');
   const [date, setDate] = useState('');
@@ -78,8 +69,8 @@ export default function Home() {
   const railRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    Promise.all([api.get('/stats'), api.get('/exhibitions'), api.get('/exhibitions/meta/filters')])
-      .then(([s, e, f]) => { setStats(s.data); setAll(e.data); setFilters(f.data); })
+    Promise.all([api.get('/exhibitions'), api.get('/exhibitions/meta/filters')])
+      .then(([e, f]) => { setAll(e.data); setFilters(f.data); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -92,9 +83,12 @@ export default function Home() {
   const cityStats = useMemo(() => ({
     live: inCity.filter((e) => e.status === 'live').length,
     upcoming: inCity.filter((e) => e.status === 'upcoming').length,
+    past: inCity.filter((e) => e.status === 'past').length,
     stalls: inCity.reduce((n, e) => n + (e.total_stalls ?? 0), 0),
   }), [inCity]);
-  const visible = useMemo(() => inCity.filter((e) => e.status === tab), [inCity, tab]);
+  const liveInCity = useMemo(() => inCity.filter((e) => e.status === 'live'), [inCity]);
+  const upcomingInCity = useMemo(() => inCity.filter((e) => e.status === 'upcoming'), [inCity]);
+  const pastInCity = useMemo(() => inCity.filter((e) => e.status === 'past'), [inCity]);
   const featuredInCity = useMemo(
     () => inCity.filter((e) => e.tags?.some((t) => ['Trending', 'Most Booked', 'Recommended'].includes(t))).slice(0, 3),
     [inCity],
@@ -137,22 +131,8 @@ export default function Home() {
                 : `Explore live and upcoming trade fairs in ${city}, meet exhibitors, watch venue reels and plan your visit.`}
             </p>
 
-            {/* Inline search */}
-            <div className="mt-7 flex flex-col gap-2 rounded-2xl border border-ink-100 bg-white p-2 shadow-soft sm:flex-row sm:items-center">
-              <div className="flex flex-1 items-center gap-2 px-3">
-                <Search width={18} className="shrink-0 text-ink-400" />
-                <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doSearch()}
-                  placeholder={`Search expos in ${city}…`} className="w-full bg-transparent py-2.5 text-sm text-ink-800 outline-none placeholder:text-ink-400" />
-              </div>
-              <select value={industry} onChange={(e) => setIndustry(e.target.value)} className="rounded-xl bg-ink-50 px-3 py-2.5 text-sm font-medium text-ink-700 outline-none sm:w-40">
-                <option value="">All industries</option>
-                {filters.industries.map((i) => <option key={i} value={i}>{i}</option>)}
-              </select>
-              <button onClick={doSearch} className="btn-primary shrink-0">Search</button>
-            </div>
-
             {/* Live city stats */}
-            <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-500">
+            <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-500">
               <span className="flex items-center gap-1.5"><span className="h-2 w-2 animate-pulse rounded-full bg-brand" /><b className="text-ink-900">{cityStats.live}</b> live in {city}</span>
               <span><b className="text-ink-900">{cityStats.upcoming}</b> upcoming</span>
               <span><b className="text-ink-900">{cityStats.stalls.toLocaleString('en-IN')}</b> stalls</span>
@@ -208,58 +188,31 @@ export default function Home() {
           </div>
         </div>
 
-
-      {/* ---------------- Live stats band ---------------- */}
-      {stats && (
-        <section className="container-px mt-10">
-          <div className="grid gap-4 rounded-2xl border border-ink-100 bg-white p-5 shadow-card sm:grid-cols-2 lg:grid-cols-4">
-            <StatPill label="Live expos" value={stats.live} accent="text-emerald-600" />
-            <StatPill label="Upcoming" value={stats.upcoming} accent="text-brand-600" />
-            <StatPill label="Exhibitors" value={stats.companies.toLocaleString('en-IN')} accent="text-grape-600" />
-            <StatPill label="Bookings" value={stats.bookings.toLocaleString('en-IN')} accent="text-sky-600" />
-          </div>
-        </section>
-      )}
-
-      {/* ---------------- Browse exhibitions in city ---------------- */}
-      <section className="container-px mt-16">
-        <SectionHeading
-          title={`Browse exhibitions in ${city}`}
-          subtitle={canBook ? 'Pick a live expo and book your stall in minutes.' : 'Explore live, upcoming and past trade fairs near you.'}
-        />
-        <div className="mt-6 flex flex-wrap gap-2">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${tab === t.key ? 'bg-brand-600 text-white shadow-soft' : 'bg-ink-50 text-ink-600 hover:bg-brand-50 hover:text-brand-700'}`}
-            >
-              {t.label}
-              <span className="ml-1.5 text-xs opacity-80">
-                ({t.key === 'live' ? cityStats.live : t.key === 'upcoming' ? cityStats.upcoming : inCity.filter((e) => e.status === 'past').length})
-              </span>
-            </button>
-          ))}
-        </div>
-        {visible.length > 0 ? (
-          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {visible.map((e) => <ExhibitionCard key={e.id} e={e} />)}
-          </div>
-        ) : (
-          <div className="mt-8 rounded-2xl border border-dashed border-ink-200 bg-ink-50 px-6 py-12 text-center">
-            <p className="font-display text-lg font-bold text-ink-800">No {tab === 'live' ? 'live' : tab} exhibitions in {city} right now</p>
-            <p className="mt-2 text-sm text-ink-500">Try another tab or switch city from the navbar.</p>
-            <Link to="/exhibitions" className="btn-primary mt-5 inline-flex px-5 py-2.5">Browse all exhibitions</Link>
-          </div>
-        )}
-        {visible.length > 0 && (
-          <div className="mt-8 text-center">
-            <Link to={`/exhibitions?city=${encodeURIComponent(city)}&status=${tab}`} className="link-brand inline-flex items-center gap-1 text-sm font-semibold">
-              View all {tab} in {city} <ArrowRight width={15} />
-            </Link>
-          </div>
-        )}
-      </section>
+      {/* ---------------- Live / Upcoming / Past (three sections) ---------------- */}
+      <CityStatusSection
+        city={city}
+        status="live"
+        title={`Live now in ${city}`}
+        subtitle={canBook ? 'Book your stall at expos running right now.' : 'Walk in, explore halls and meet exhibitors today.'}
+        items={liveInCity}
+        count={cityStats.live}
+      />
+      <CityStatusSection
+        city={city}
+        status="upcoming"
+        title={`Upcoming in ${city}`}
+        subtitle="Plan ahead — reserve stalls before they sell out."
+        items={upcomingInCity}
+        count={cityStats.upcoming}
+      />
+      <CityStatusSection
+        city={city}
+        status="past"
+        title={`Past exhibitions in ${city}`}
+        subtitle="Look back at recent trade fairs and venue reports."
+        items={pastInCity}
+        count={cityStats.past}
+      />
 
       {/* ---------------- Featured in city ---------------- */}
       {featuredInCity.length > 0 && (
@@ -482,12 +435,43 @@ function HeroVisual({
   );
 }
 
-function StatPill({ label, value, accent }: { label: string; value: string | number; accent: string }) {
+function CityStatusSection({
+  city,
+  status,
+  title,
+  subtitle,
+  items,
+  count,
+}: {
+  city: string;
+  status: 'live' | 'upcoming' | 'past';
+  title: string;
+  subtitle: string;
+  items: Exhibition[];
+  count: number;
+}) {
   return (
-    <div className="text-center sm:text-left">
-      <div className={`font-display text-2xl font-extrabold ${accent}`}>{value}</div>
-      <div className="text-sm text-ink-500">{label}</div>
-    </div>
+    <section className="container-px mt-16">
+      <SectionHeading title={title} subtitle={subtitle} />
+      {items.length > 0 ? (
+        <>
+          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((e) => <ExhibitionCard key={e.id} e={e} />)}
+          </div>
+          <div className="mt-8 text-center">
+            <Link to={`/exhibitions?city=${encodeURIComponent(city)}&status=${status}`} className="link-brand inline-flex items-center gap-1 text-sm font-semibold">
+              View all {count} {status === 'live' ? 'live' : status} in {city} <ArrowRight width={15} />
+            </Link>
+          </div>
+        </>
+      ) : (
+        <div className="mt-8 rounded-2xl border border-dashed border-ink-200 bg-ink-50 px-6 py-12 text-center">
+          <p className="font-display text-lg font-bold text-ink-800">No {status === 'live' ? 'live' : status} exhibitions in {city} right now</p>
+          <p className="mt-2 text-sm text-ink-500">Switch city from the navbar or browse all exhibitions.</p>
+          <Link to="/exhibitions" className="btn-primary mt-5 inline-flex px-5 py-2.5">Browse all exhibitions</Link>
+        </div>
+      )}
+    </section>
   );
 }
 

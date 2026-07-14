@@ -147,6 +147,66 @@ app.get('/api/exhibitions/:slug', async (req, res) => {
   });
 });
 
+// ---------------- Exhibition comments ----------------
+app.get('/api/exhibitions/:slug/comments', async (req, res) => {
+  const e = one(await db.execute({ sql: 'SELECT id FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
+  if (!e) return res.status(404).json({ error: 'Exhibition not found' });
+  const list = rows(await db.execute({
+    sql: `SELECT * FROM exhibition_comments WHERE exhibition_id=? ORDER BY created_at DESC, id DESC`,
+    args: [e.id],
+  }));
+  res.json(list);
+});
+
+app.post('/api/exhibitions/:slug/comments', authOptional, async (req, res) => {
+  try {
+    const e = one(await db.execute({ sql: 'SELECT id FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
+    if (!e) return res.status(404).json({ error: 'Exhibition not found' });
+    const { author_name, author_city, body, rating = 5 } = req.body || {};
+    if (!author_name?.trim() || !body?.trim()) return res.status(400).json({ error: 'Name and comment are required' });
+    const r = await db.execute({
+      sql: `INSERT INTO exhibition_comments (exhibition_id,user_id,author_name,author_city,body,rating)
+            VALUES (?,?,?,?,?,?)`,
+      args: [e.id, req.user?.id || null, author_name.trim(), author_city?.trim() || null, body.trim(), Math.min(5, Math.max(1, Number(rating) || 5))],
+    });
+    const row = one(await db.execute({ sql: 'SELECT * FROM exhibition_comments WHERE id=?', args: [Number(r.lastInsertRowid)] }));
+    res.status(201).json(row);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Could not post comment' }); }
+});
+
+// ---------------- Exhibition community media (video / photo) ----------------
+app.get('/api/exhibitions/:slug/media', async (req, res) => {
+  const e = one(await db.execute({ sql: 'SELECT id FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
+  if (!e) return res.status(404).json({ error: 'Exhibition not found' });
+  const list = rows(await db.execute({
+    sql: `SELECT * FROM exhibition_media WHERE exhibition_id=? ORDER BY created_at DESC, id DESC`,
+    args: [e.id],
+  }));
+  res.json(list);
+});
+
+app.post('/api/exhibitions/:slug/media', authOptional, async (req, res) => {
+  try {
+    const e = one(await db.execute({ sql: 'SELECT id, gallery FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
+    if (!e) return res.status(404).json({ error: 'Exhibition not found' });
+    const { author_name, kind = 'photo', url, caption } = req.body || {};
+    if (!author_name?.trim() || !url?.trim()) return res.status(400).json({ error: 'Name and URL are required' });
+    const safeKind = kind === 'video' ? 'video' : 'photo';
+    const r = await db.execute({
+      sql: `INSERT INTO exhibition_media (exhibition_id,user_id,author_name,kind,url,caption) VALUES (?,?,?,?,?,?)`,
+      args: [e.id, req.user?.id || null, author_name.trim(), safeKind, url.trim(), caption?.trim() || null],
+    });
+    // Photos also append to gallery for immediate display
+    if (safeKind === 'photo') {
+      const gallery = parseJSON(e.gallery, []);
+      gallery.unshift(url.trim());
+      await db.execute({ sql: 'UPDATE exhibitions SET gallery=? WHERE id=?', args: [JSON.stringify(gallery), e.id] });
+    }
+    const row = one(await db.execute({ sql: 'SELECT * FROM exhibition_media WHERE id=?', args: [Number(r.lastInsertRowid)] }));
+    res.status(201).json(row);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Could not add media' }); }
+});
+
 // ---------------- Floor plan ----------------
 app.get('/api/halls/:hallId/stalls', async (req, res) => {
   const stalls = rows(await db.execute({

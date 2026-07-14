@@ -21,6 +21,12 @@ const logo = (name, color = '2563eb') =>
     hotel: 'photo-1566073771259-6a8506099945',
     logistics: 'photo-1586528116311-ad8dd3c8310d',
     home: 'photo-1558002038-1055907df827',
+    fashion: 'photo-1558618666-fcd25c85cd64',
+    education: 'photo-1523050854058-8df90110c9f1',
+    property: 'photo-1486406146926-c627a92ad1ab',
+    beauty: 'photo-1522335789203-aabd1fc54bc9',
+    gaming: 'photo-1542751371-adc38448a05e',
+    furniture: 'photo-1555041469-a586c61ea9bc',
   };
 const galleryPhotos = [
   'photo-1540575467063-178a50c2df87',
@@ -43,6 +49,9 @@ const VENUE = {
   biec: { venue: 'BIEC (Bangalore Intl. Exhibition Centre)', city: 'Bengaluru', address: 'Tumkur Road, Dasarahalli, Bengaluru, Karnataka 562123', lat: 13.0716, lng: 77.4784 },
   ktpo: { venue: 'KTPO Trade Centre', city: 'Bengaluru', address: 'ITPL Main Road, Whitefield, Bengaluru, Karnataka 560066', lat: 12.9850, lng: 77.7360 },
   palace: { venue: 'Palace Grounds', city: 'Bengaluru', address: 'Jayamahal Main Road, Bengaluru, Karnataka 560006', lat: 12.9981, lng: 77.5920 },
+  manpho: { venue: 'Manpho Convention Centre', city: 'Bengaluru', address: 'Opp. Mekhri Circle, Bengaluru, Karnataka 560080', lat: 13.0125, lng: 77.5840 },
+  lalit: { venue: 'The Lalit Ashok Convention Centre', city: 'Bengaluru', address: 'Kumara Krupa High Grounds, Bengaluru, Karnataka 560001', lat: 12.9890, lng: 77.5850 },
+  ecity: { venue: 'Electronic City Convention Hub', city: 'Bengaluru', address: 'Electronic City Phase 1, Bengaluru, Karnataka 560100', lat: 12.8452, lng: 77.6602 },
   // Mumbai
   nesco: { venue: 'Bombay Exhibition Centre (NESCO)', city: 'Mumbai', address: 'Western Express Highway, Goregaon East, Mumbai, Maharashtra 400063', lat: 19.1540, lng: 72.8500 },
   jio: { venue: 'Jio World Convention Centre', city: 'Mumbai', address: 'BKC, Bandra East, Mumbai, Maharashtra 400051', lat: 19.0662, lng: 72.8676 },
@@ -149,24 +158,43 @@ async function run() {
     organizerIds.push(Number(r.lastInsertRowid));
   }
 
-  // ---------------- Exhibitions (all in Bengaluru) ----------------
+  // ---------------- Exhibitions (Bengaluru-heavy + other metros) ----------------
   const gallery = JSON.stringify(galleryPhotos.map((g) => img(g, 800, 500)));
   const exhibitionDefs = [
-    // Live now
+    // ---- Bengaluru LIVE ----
     { slug: 'india-plast-2026', name: 'India Plast 2026', tagline: 'The Largest Plastics & Polymer Show', industry: 'Plastics', banner: banners.plast, ...VENUE.biec, org: 0, startOffset: -1, days: 4, status: 'live', price: 45000, visitorsToday: 4582, totalVisitors: 250000, tags: ['Trending', 'Most Booked', 'B2B'], b2b: 1, intl: 1, yt: DEMO_YT[0] },
+    { slug: 'india-craft-fair-2026', name: 'India Craft Fair 2026', tagline: 'Handicrafts & Lifestyle Bazaar', industry: 'Handicrafts', banner: banners.craft, ...VENUE.palace, org: 2, startOffset: -2, days: 5, status: 'live', price: 28000, visitorsToday: 6120, totalVisitors: 80000, tags: ['Live', 'Free Entry', 'B2C'], b2b: 0, entryFree: 1, yt: DEMO_YT[3] },
+    { slug: 'bengaluru-tech-summit-2026', name: 'Bengaluru Tech Summit 2026', tagline: 'Asia\'s Premier Technology Showcase', industry: 'Technology', banner: banners.tech, ...VENUE.biec, org: 1, startOffset: 0, days: 3, status: 'live', price: 55000, visitorsToday: 8920, totalVisitors: 180000, tags: ['Trending', 'Live', 'B2B'], b2b: 1, intl: 1, yt: DEMO_YT[1] },
+    { slug: 'electronics-for-you-blr-2026', name: 'Electronics For You Expo 2026', tagline: 'Embedded Systems, IoT & Electronics', industry: 'Technology', banner: banners.tech, ...VENUE.ktpo, org: 1, startOffset: -1, days: 3, status: 'live', price: 42000, visitorsToday: 4100, totalVisitors: 65000, tags: ['Live', 'Recommended'], b2b: 1, yt: DEMO_YT[2] },
+    { slug: 'bangalore-food-hospitality-2026', name: 'Bangalore Food & Hospitality Show', tagline: 'F&B, Cloud Kitchens & Hotel Solutions', industry: 'Food & Beverage', banner: banners.food, ...VENUE.manpho, org: 0, startOffset: -2, days: 4, status: 'live', price: 36000, visitorsToday: 2750, totalVisitors: 42000, tags: ['Live', 'B2B'], b2b: 1, yt: DEMO_YT[0] },
+    // ---- Other metros LIVE ----
     { slug: 'foodtech-india-2026', name: 'FoodTech India 2026', tagline: 'Food Processing & Packaging Expo', industry: 'Food & Beverage', banner: banners.food, ...VENUE.nesco, org: 1, startOffset: -1, days: 4, status: 'live', price: 38000, visitorsToday: 3245, totalVisitors: 120000, tags: ['Live', 'Recommended'], b2b: 1, intl: 0, yt: DEMO_YT[1] },
     { slug: 'automation-expo-2026', name: 'Automation Expo 2026', tagline: 'Smart Factory & Robotics', industry: 'Industrial Automation', banner: banners.auto, ...VENUE.pragati, org: 1, startOffset: 0, days: 3, status: 'live', price: 52000, visitorsToday: 3393, totalVisitors: 95000, tags: ['New Launch', 'B2B'], b2b: 1, intl: 1, yt: DEMO_YT[2] },
-    { slug: 'india-craft-fair-2026', name: 'India Craft Fair 2026', tagline: 'Handicrafts & Lifestyle Bazaar', industry: 'Handicrafts', banner: banners.craft, ...VENUE.palace, org: 2, startOffset: -2, days: 5, status: 'live', price: 28000, visitorsToday: 6120, totalVisitors: 80000, tags: ['Live', 'Free Entry', 'B2C'], b2b: 0, entryFree: 1, yt: DEMO_YT[3] },
     { slug: 'hospitality-india-2026', name: 'Hospitality India 2026', tagline: 'Hotels, F&B & Banquet Solutions', industry: 'Hospitality', banner: banners.hotel, ...VENUE.hitex, org: 0, startOffset: -1, days: 3, status: 'live', price: 48000, visitorsToday: 2100, totalVisitors: 45000, tags: ['Live', 'B2B'], b2b: 1, yt: DEMO_YT[0] },
-    // Upcoming
+    // ---- Bengaluru UPCOMING ----
+    { slug: 'print-pack-2026', name: 'Print & Pack 2026', tagline: 'Printing & Packaging Technology', industry: 'Printing & Packaging', banner: banners.print, ...VENUE.ktpo, org: 0, startOffset: 18, days: 3, status: 'upcoming', price: 36000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Early Bird'], early: 1, yt: DEMO_YT[2] },
+    { slug: 'imtex-forming-2026', name: 'IMTEX Forming 2026', tagline: 'Machine Tools & Metal Forming', industry: 'Industrial Automation', banner: banners.auto, ...VENUE.biec, org: 1, startOffset: 28, days: 5, status: 'upcoming', price: 68000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'International', 'Most Booked'], intl: 1, b2b: 1, early: 1, yt: DEMO_YT[1] },
+    { slug: 'bengaluru-property-expo-2026', name: 'Bengaluru Property Expo 2026', tagline: 'Homes, Plots & Commercial Spaces', industry: 'Real Estate', banner: banners.property, ...VENUE.palace, org: 2, startOffset: 35, days: 3, status: 'upcoming', price: 48000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Free Entry'], entryFree: 1, yt: DEMO_YT[3] },
+    { slug: 'acetech-bengaluru-2026', name: 'ACETECH Bengaluru 2026', tagline: 'Architecture, Design & Construction', industry: 'Building & Construction', banner: banners.home, ...VENUE.biec, org: 0, startOffset: 45, days: 4, status: 'upcoming', price: 52000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'B2B'], b2b: 1, yt: DEMO_YT[0] },
+    { slug: 'beauty-wellness-blr-2026', name: 'Beauty & Wellness Expo Bengaluru', tagline: 'Cosmetics, Spa & Salon Solutions', industry: 'Healthcare', banner: banners.beauty, ...VENUE.lalit, org: 0, startOffset: 55, days: 3, status: 'upcoming', price: 32000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'New Launch'], early: 1, yt: DEMO_YT[2] },
+    { slug: 'edu-fair-bengaluru-2026', name: 'EduFair Bengaluru 2026', tagline: 'Universities, Courses & Careers', industry: 'Education', banner: banners.education, ...VENUE.manpho, org: 2, startOffset: 62, days: 3, status: 'upcoming', price: 25000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Free Entry'], entryFree: 1, yt: DEMO_YT[1] },
+    { slug: 'furniture-furnishings-blr-2026', name: 'Furniture & Furnishings Fair', tagline: 'Home, Office & Contract Furniture', industry: 'Home Automation', banner: banners.furniture, ...VENUE.ktpo, org: 0, startOffset: 72, days: 4, status: 'upcoming', price: 38000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'B2B'], b2b: 1, yt: DEMO_YT[3] },
+    { slug: 'india-gaming-show-blr-2026', name: 'India Gaming Show Bengaluru', tagline: 'Esports, Consoles & Game Studios', industry: 'Technology', banner: banners.gaming, ...VENUE.ecity, org: 1, startOffset: 85, days: 3, status: 'upcoming', price: 40000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'New Launch'], early: 1, yt: DEMO_YT[0] },
+    { slug: 'renewable-energy-blr-2026', name: 'Renewable Energy South 2026', tagline: 'Solar, Storage & Green Industry', industry: 'Renewable Energy', banner: banners.energy, ...VENUE.biec, org: 2, startOffset: 95, days: 3, status: 'upcoming', price: 44000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Government'], gov: 1, early: 1, yt: DEMO_YT[1] },
+    // ---- Other metros UPCOMING ----
     { slug: 'renewable-energy-2026', name: 'Renewable Energy India 2026', tagline: 'Solar, Wind & Storage', industry: 'Renewable Energy', banner: banners.energy, ...VENUE.ctc, org: 2, startOffset: 15, days: 4, status: 'upcoming', price: 41000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Government'], early: 1, gov: 1, yt: DEMO_YT[1] },
-    { slug: 'print-pack-2026', name: 'Print & Pack 2026', tagline: 'Printing & Packaging Technology', industry: 'Printing & Packaging', banner: banners.print, ...VENUE.ktpo, org: 0, startOffset: 32, days: 3, status: 'upcoming', price: 36000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Early Bird'], early: 1, yt: DEMO_YT[2] },
     { slug: 'medtech-2026', name: 'MedTech India 2026', tagline: 'Medical Devices & Healthcare', industry: 'Medical Equipment', banner: banners.medical, ...VENUE.hitex, org: 1, startOffset: 48, days: 3, status: 'upcoming', price: 60000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'International'], intl: 1, entryFree: 1, yt: DEMO_YT[3] },
     { slug: 'smart-home-expo-2026', name: 'Smart Home Expo 2026', tagline: 'IoT Living & Home Automation', industry: 'Home Automation', banner: banners.home, ...VENUE.autocluster, org: 1, startOffset: 60, days: 3, status: 'upcoming', price: 35000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'New Launch'], early: 1, yt: DEMO_YT[0] },
     { slug: 'logistics-india-2026', name: 'Logistics India 2026', tagline: 'Warehousing, Freight & Expo Logistics', industry: 'Logistics', banner: banners.logistics, ...VENUE.jio, org: 0, startOffset: 75, days: 3, status: 'upcoming', price: 40000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'B2B'], b2b: 1, yt: DEMO_YT[1] },
     { slug: 'india-lifestyle-2026', name: 'India Lifestyle Expo 2026', tagline: 'Crafts, Décor & Fashion', industry: 'Handicrafts', banner: banners.craft, ...VENUE.yasho, org: 2, startOffset: 90, days: 4, status: 'upcoming', price: 22000, visitorsToday: 0, totalVisitors: 0, tags: ['Upcoming', 'Free Entry'], entryFree: 1, yt: DEMO_YT[2] },
-    // Past
+    // ---- Bengaluru PAST ----
     { slug: 'india-plast-2025', name: 'India Plast 2025', tagline: 'Plastics & Polymer Show', industry: 'Plastics', banner: banners.plast, ...VENUE.biec, org: 0, startOffset: -365, days: 4, status: 'past', price: 42000, visitorsToday: 0, totalVisitors: 235000, tags: ['Past'], yt: DEMO_YT[3] },
+    { slug: 'bengaluru-tech-summit-2025', name: 'Bengaluru Tech Summit 2025', tagline: 'Technology & Innovation Showcase', industry: 'Technology', banner: banners.tech, ...VENUE.biec, org: 1, startOffset: -280, days: 3, status: 'past', price: 50000, visitorsToday: 0, totalVisitors: 165000, tags: ['Past'], yt: DEMO_YT[1] },
+    { slug: 'imtex-2025', name: 'IMTEX 2025', tagline: 'International Machine Tool Exhibition', industry: 'Industrial Automation', banner: banners.auto, ...VENUE.biec, org: 1, startOffset: -220, days: 5, status: 'past', price: 62000, visitorsToday: 0, totalVisitors: 210000, tags: ['Past'], yt: DEMO_YT[2] },
+    { slug: 'bangalore-fashion-week-2025', name: 'Bangalore Fashion Week 2025', tagline: 'Runway, Retail & Designer Showcase', industry: 'Textile Machinery', banner: banners.fashion, ...VENUE.palace, org: 0, startOffset: -160, days: 4, status: 'past', price: 35000, visitorsToday: 0, totalVisitors: 48000, tags: ['Past'], yt: DEMO_YT[0] },
+    { slug: 'packplus-south-2025', name: 'PackPlus South 2025', tagline: 'Packaging Machinery & Materials', industry: 'Printing & Packaging', banner: banners.print, ...VENUE.ktpo, org: 0, startOffset: -110, days: 3, status: 'past', price: 34000, visitorsToday: 0, totalVisitors: 38000, tags: ['Past'], yt: DEMO_YT[3] },
+    { slug: 'bengaluru-bio-expo-2025', name: 'Bengaluru Bio Expo 2025', tagline: 'Biotech, Pharma & Life Sciences', industry: 'Medical Equipment', banner: banners.medical, ...VENUE.manpho, org: 2, startOffset: -75, days: 3, status: 'past', price: 48000, visitorsToday: 0, totalVisitors: 29000, tags: ['Past'], yt: DEMO_YT[1] },
+    // ---- Other metros PAST ----
     { slug: 'textile-expo-2025', name: 'Textile Expo 2025', tagline: 'Weaving & Spinning Machinery', industry: 'Textile Machinery', banner: banners.textile, ...VENUE.ctc, org: 2, startOffset: -200, days: 3, status: 'past', price: 33000, visitorsToday: 0, totalVisitors: 88000, tags: ['Past'], yt: DEMO_YT[0] },
     { slug: 'auto-components-2025', name: 'Auto Components Expo 2025', tagline: 'OEM Parts & EV Supply Chain', industry: 'Automotive', banner: banners.auto, ...VENUE.autocluster, org: 1, startOffset: -120, days: 3, status: 'past', price: 39000, visitorsToday: 0, totalVisitors: 52000, tags: ['Past'], yt: DEMO_YT[1] },
     { slug: 'india-print-2025', name: 'India Print Fair 2025', tagline: 'Print Media & Packaging', industry: 'Printing & Packaging', banner: banners.print, ...VENUE.nesco, org: 0, startOffset: -90, days: 4, status: 'past', price: 30000, visitorsToday: 0, totalVisitors: 41000, tags: ['Past'], yt: DEMO_YT[2] },
@@ -351,6 +379,46 @@ async function run() {
         'Rohit Sharma', 'visitor@expomela.com', '+91 98765 00003', m.subject, m.body, 'unread',
       ],
     });
+  }
+
+  // ---------------- Dummy comments (demo) ----------------
+  const commentPool = [
+    { name: 'Ananya Krishnan', city: 'Bengaluru', body: 'Excellent floor plan and stall booking was seamless. Met 12 new suppliers on day one.', rating: 5 },
+    { name: 'Vikram Rao', city: 'Mysuru', body: 'Crowds were strong and the venue layout was easy to navigate. Will book again next year.', rating: 5 },
+    { name: 'Sneha Patel', city: 'Ahmedabad', body: 'Good networking, though parking was a bit chaotic in the evening. Overall worth it.', rating: 4 },
+    { name: 'Arjun Menon', city: 'Kochi', body: 'The seminars were practical and the exhibitor quality was top-notch.', rating: 5 },
+    { name: 'Fatima Sheikh', city: 'Hyderabad', body: 'Loved the live demos. Wish there were more food options inside the hall.', rating: 4 },
+    { name: 'Karthik Reddy', city: 'Bengaluru', body: 'Booked a corner stall via Expo Mela in under 5 minutes. Instant confirmation felt premium.', rating: 5 },
+    { name: 'Meera Iyer', city: 'Chennai', body: 'Great for B2B meetings. The interactive map helped us find partners quickly.', rating: 5 },
+    { name: 'Rahul Desai', city: 'Pune', body: 'Solid show. Hall A had the best footfall for machinery buyers.', rating: 4 },
+  ];
+  for (const e of exhibitionDefs) {
+    const exId = exhibitionIds[e.slug];
+    const picks = commentPool.slice(0, e.status === 'upcoming' ? 4 : 6);
+    for (const c of picks) {
+      await db.execute({
+        sql: `INSERT INTO exhibition_comments (exhibition_id,user_id,author_name,author_city,body,rating,created_at)
+              VALUES (?,?,?,?,?,?,datetime('now', ?))`,
+        args: [exId, null, c.name, c.city, c.body, c.rating, `-${Math.floor(Math.random() * 14)} days`],
+      });
+    }
+  }
+
+  // ---------------- Community media samples ----------------
+  const mediaSamples = [
+    { kind: 'video', url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', caption: 'Hall walkthrough on opening day', author: 'Rohit Sharma' },
+    { kind: 'photo', url: img('photo-1540575467063-178a50c2df87', 800, 500), caption: 'Busy aisle in Hall A', author: 'Priya Nair' },
+    { kind: 'photo', url: img('photo-1511578314322-379afb476865', 800, 500), caption: 'Keynote stage setup', author: 'Ananya Krishnan' },
+    { kind: 'video', url: 'https://www.youtube.com/watch?v=ScMzIvxBSi4', caption: 'Product demo highlight reel', author: 'Rajesh Verma' },
+  ];
+  for (const e of exhibitionDefs.filter((x) => x.city === 'Bengaluru')) {
+    const exId = exhibitionIds[e.slug];
+    for (const m of mediaSamples) {
+      await db.execute({
+        sql: `INSERT INTO exhibition_media (exhibition_id,author_name,kind,url,caption) VALUES (?,?,?,?,?)`,
+        args: [exId, m.author, m.kind, m.url, m.caption],
+      });
+    }
   }
 
   console.log(`[seed] Done. Users: ${users.length}, Companies: ${companies.length}, Exhibitions: ${exhibitionDefs.length}, Stalls: ${totalStalls}`);
