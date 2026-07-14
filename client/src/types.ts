@@ -35,6 +35,7 @@ export interface Exhibition {
   early_bird: number;
   tags: string[];
   gallery: string[];
+  documents?: MediaDoc[];
   youtube_url?: string;
   reel_url?: string;
   address?: string;
@@ -86,6 +87,16 @@ export interface Stall {
   grid_col: number;
   company_name?: string;
   company_logo?: string;
+  company_id?: number;
+  company_industry?: string;
+  company_about?: string;
+  company_website?: string;
+  company_email?: string;
+  company_phone?: string;
+  company_city?: string;
+  company_contact?: string;
+  company_youtube?: string;
+  company_reel?: string;
   hall_name?: string;
   description?: string;
   facilities?: string[];
@@ -163,7 +174,7 @@ export interface ExhibitionMedia {
   exhibition_id: number;
   user_id?: number | null;
   author_name: string;
-  kind: 'photo' | 'video';
+  kind: 'photo' | 'video' | 'reel';
   url: string;
   caption?: string | null;
   created_at: string;

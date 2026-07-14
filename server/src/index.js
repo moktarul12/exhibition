@@ -26,7 +26,7 @@ function publicUser(u) {
   return rest;
 }
 function mapExhibition(e) {
-  return { ...e, tags: parseJSON(e.tags, []), gallery: parseJSON(e.gallery, []) };
+  return { ...e, tags: parseJSON(e.tags, []), gallery: parseJSON(e.gallery, []), documents: parseJSON(e.documents, []) };
 }
 
 // ---------------- Health ----------------
@@ -191,7 +191,7 @@ app.post('/api/exhibitions/:slug/media', authOptional, async (req, res) => {
     if (!e) return res.status(404).json({ error: 'Exhibition not found' });
     const { author_name, kind = 'photo', url, caption } = req.body || {};
     if (!author_name?.trim() || !url?.trim()) return res.status(400).json({ error: 'Name and URL are required' });
-    const safeKind = kind === 'video' ? 'video' : 'photo';
+    const safeKind = ['video', 'reel', 'photo'].includes(kind) ? kind : 'photo';
     const r = await db.execute({
       sql: `INSERT INTO exhibition_media (exhibition_id,user_id,author_name,kind,url,caption) VALUES (?,?,?,?,?,?)`,
       args: [e.id, req.user?.id || null, author_name.trim(), safeKind, url.trim(), caption?.trim() || null],
@@ -219,7 +219,9 @@ app.get('/api/halls/:hallId/stalls', async (req, res) => {
 
 app.get('/api/stalls/:id', async (req, res) => {
   const s = one(await db.execute({
-    sql: `SELECT s.*, h.name hall_name, h.exhibition_id, c.name company_name, c.logo company_logo
+    sql: `SELECT s.*, h.name hall_name, h.exhibition_id, c.id company_id, c.name company_name, c.logo company_logo,
+            c.industry company_industry, c.about company_about, c.website company_website, c.email company_email,
+            c.phone company_phone, c.city company_city, c.contact_person company_contact, c.youtube_url company_youtube, c.reel_url company_reel
           FROM stalls s JOIN halls h ON s.hall_id=h.id
           LEFT JOIN companies c ON s.booked_by_company_id=c.id WHERE s.id=?`,
     args: [req.params.id],
@@ -436,6 +438,128 @@ app.get('/api/admin/exhibitions', authRequired, requireRole('admin'), async (_re
     FROM exhibitions e LEFT JOIN bookings b ON b.exhibition_id=e.id GROUP BY e.id
     ORDER BY e.start_date DESC`));
   res.json(list.map(mapExhibition));
+});
+
+app.post('/api/admin/exhibitions', authRequired, requireRole('admin'), async (req, res) => {
+  try {
+    const {
+      name, tagline, industry, about, banner, venue, city, address, lat, lng,
+      start_date, end_date, status = 'upcoming', price_from = 45000,
+      entry_free = 0, international = 0, government = 0, b2b = 1, early_bird = 0,
+      tags = [], youtube_url, reel_url, create_floor_plan = true, hall_count = 2, grid_rows = 6, grid_cols = 8,
+    } = req.body || {};
+    if (!name?.trim() || !industry?.trim() || !venue?.trim() || !city?.trim() || !start_date || !end_date) {
+      return res.status(400).json({ error: 'Name, industry, venue, city, start and end dates are required' });
+    }
+    const baseSlug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'exhibition';
+    let slug = baseSlug;
+    let n = 1;
+    while (one(await db.execute({ sql: 'SELECT id FROM exhibitions WHERE slug=?', args: [slug] }))) {
+      slug = `${baseSlug}-${++n}`;
+    }
+    const org = one(await db.execute('SELECT id FROM organizers ORDER BY id LIMIT 1'));
+    const gallery = JSON.stringify([]);
+    const documents = JSON.stringify([
+      { name: 'Visitor Guidelines.pdf', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', type: 'pdf' },
+      { name: 'Floor Plan Map.pdf', url: 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf', type: 'pdf' },
+    ]);
+    const defaultBanner = banner || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&h=500&q=80';
+    const r = await db.execute({
+      sql: `INSERT INTO exhibitions
+        (slug,name,tagline,industry,about,banner,venue,city,lat,lng,organizer_id,start_date,end_date,status,price_from,visitors_today,total_visitors,entry_free,international,government,b2b,early_bird,tags,gallery,documents,youtube_url,reel_url,address)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      args: [
+        slug, name.trim(), tagline || null, industry.trim(),
+        about || `${name} at ${venue}, ${city}.`,
+        defaultBanner, venue.trim(), city.trim(),
+        lat != null ? Number(lat) : null, lng != null ? Number(lng) : null,
+        org?.id || null, start_date, end_date, ['live', 'upcoming', 'past'].includes(status) ? status : 'upcoming',
+        Number(price_from) || 0, 0, 0,
+        entry_free ? 1 : 0, international ? 1 : 0, government ? 1 : 0, b2b ? 1 : 0, early_bird ? 1 : 0,
+        JSON.stringify(Array.isArray(tags) ? tags : []), gallery, documents,
+        youtube_url || null, reel_url || null, address || null,
+      ],
+    });
+    const exhibitionId = Number(r.lastInsertRowid);
+
+    if (create_floor_plan) {
+      const hallsN = Math.min(Math.max(Number(hall_count) || 2, 1), 6);
+      const rowsN = Math.min(Math.max(Number(grid_rows) || 6, 3), 12);
+      const colsN = Math.min(Math.max(Number(grid_cols) || 8, 4), 16);
+      for (let h = 0; h < hallsN; h++) {
+        const hallName = `Hall ${String.fromCharCode(65 + h)}`;
+        const hr = await db.execute({
+          sql: `INSERT INTO halls (exhibition_id,name,grid_rows,grid_cols) VALUES (?,?,?,?)`,
+          args: [exhibitionId, hallName, rowsN, colsN],
+        });
+        const hallId = Number(hr.lastInsertRowid);
+        for (let row = 0; row < rowsN; row++) {
+          for (let col = 0; col < colsN; col++) {
+            if ((row === 2 || row === 3) && (col === 3 || col === 4) && colsN >= 6) continue;
+            const code = `${String.fromCharCode(65 + h)}-${String(row * colsN + col + 1).padStart(2, '0')}`;
+            const isCorner = col === 0 || col === colsN - 1 || row === 0 || row === rowsN - 1;
+            const isPremium = row < 2;
+            const price = (isPremium ? 65000 : 42000) + (isCorner ? 8000 : 0);
+            await db.execute({
+              sql: `INSERT INTO stalls (hall_id,code,zone,type,status,width,depth,area,price,grid_row,grid_col,description,facilities)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              args: [
+                hallId, code, isPremium ? 'Premium' : 'Standard', isCorner ? 'Corner' : 'Standard', 'available',
+                3, 3, 9, price, row, col,
+                `${isPremium ? 'Premium' : 'Standard'} stall in ${hallName}.`,
+                JSON.stringify(['Electricity 15A', 'Wi‑Fi', 'Spotlights', 'Carpet', 'Fascia board']),
+              ],
+            });
+          }
+        }
+      }
+    }
+
+    const created = one(await db.execute({ sql: 'SELECT * FROM exhibitions WHERE id=?', args: [exhibitionId] }));
+    res.status(201).json(mapExhibition(created));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not create exhibition' });
+  }
+});
+
+// Create an additional hall + stalls for an exhibition (admin floor plan builder)
+app.post('/api/admin/exhibitions/:slug/halls', authRequired, requireRole('admin'), async (req, res) => {
+  try {
+    const e = one(await db.execute({ sql: 'SELECT * FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
+    if (!e) return res.status(404).json({ error: 'Exhibition not found' });
+    const { name, grid_rows = 6, grid_cols = 8 } = req.body || {};
+    const existing = rows(await db.execute({ sql: 'SELECT name FROM halls WHERE exhibition_id=? ORDER BY id', args: [e.id] }));
+    const hallName = name?.trim() || `Hall ${String.fromCharCode(65 + existing.length)}`;
+    const rowsN = Math.min(Math.max(Number(grid_rows) || 6, 3), 12);
+    const colsN = Math.min(Math.max(Number(grid_cols) || 8, 4), 16);
+    const hr = await db.execute({
+      sql: `INSERT INTO halls (exhibition_id,name,grid_rows,grid_cols) VALUES (?,?,?,?)`,
+      args: [e.id, hallName, rowsN, colsN],
+    });
+    const hallId = Number(hr.lastInsertRowid);
+    const letter = hallName.match(/Hall\s+([A-Z])/i)?.[1]?.toUpperCase() || String.fromCharCode(65 + existing.length);
+    for (let row = 0; row < rowsN; row++) {
+      for (let col = 0; col < colsN; col++) {
+        if ((row === 2 || row === 3) && (col === 3 || col === 4) && colsN >= 6) continue;
+        const code = `${letter}-${String(row * colsN + col + 1).padStart(2, '0')}`;
+        await db.execute({
+          sql: `INSERT INTO stalls (hall_id,code,zone,type,status,width,depth,area,price,grid_row,grid_col,description,facilities)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          args: [
+            hallId, code, row < 2 ? 'Premium' : 'Standard', (col === 0 || col === colsN - 1) ? 'Corner' : 'Standard',
+            'available', 3, 3, 9, row < 2 ? 65000 : 42000, row, col,
+            `Stall in ${hallName}.`, JSON.stringify(['Electricity 15A', 'Wi‑Fi', 'Spotlights', 'Carpet']),
+          ],
+        });
+      }
+    }
+    const hall = one(await db.execute({ sql: 'SELECT * FROM halls WHERE id=?', args: [hallId] }));
+    res.status(201).json(hall);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not create hall' });
+  }
 });
 
 // Update stall status from admin floor-plan editor

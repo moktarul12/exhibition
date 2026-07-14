@@ -5,16 +5,12 @@ import type { Exhibition } from '../types';
 import { Spinner, SectionHeading } from '../components/ui';
 import ExhibitionCard from '../components/ExhibitionCard';
 import {
-  Search, MapPin, Calendar, Users, Building, Ticket, Grid, ArrowRight, ChevronRight,
+  MapPin, Calendar, Users, Building, Ticket, Grid, ArrowRight, ChevronRight,
   Eye, Trending, Shield, Headset, Zap, Layout, Cog, Chip, Cup, Heart, Crane, Car, Bookmark,
   Star,
 } from '../components/icons';
 import { useAuth } from '../auth';
 import { useCity } from '../city';
-
-
-
-
 
 const INDUSTRIES = [
   { name: 'Industrial', icon: Cog, events: '125+ Events', bg: 'bg-brand-50 text-brand-600', q: 'Industrial Automation' },
@@ -33,15 +29,6 @@ const WHY = [
   { icon: Headset, title: 'Dedicated Support', desc: "We're here to help you succeed", bg: 'bg-amber-50 text-amber-600' },
 ];
 
-const POPULAR = [
-  { label: 'Bangalore', city: 'Bengaluru' },
-  { label: 'Mumbai', city: 'Mumbai' },
-  { label: 'Delhi', city: 'New Delhi' },
-  { label: 'Chennai', city: 'Chennai' },
-  { label: 'Hyderabad', city: 'Hyderabad' },
-  { label: 'Pune', city: 'Pune' },
-];
-
 const BADGE_STYLES: Record<string, string> = {
   Featured: 'bg-brand-600 text-white',
   Trending: 'bg-emerald-500 text-white',
@@ -56,21 +43,16 @@ const BADGE_STYLES: Record<string, string> = {
 export default function Home() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { city, setCity } = useCity();
+  const { city } = useCity();
   const canBook = user?.role === 'exhibitor' || user?.role === 'admin';
   const [all, setAll] = useState<Exhibition[]>([]);
-  const [filters, setFilters] = useState<{ industries: string[]; cities: string[] }>({ industries: [], cities: [] });
   const [loading, setLoading] = useState(true);
-  const [q, setQ] = useState('');
-  const [loc, setLoc] = useState('');
-  const [date, setDate] = useState('');
-  const [industry, setIndustry] = useState('');
 
   const railRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    Promise.all([api.get('/exhibitions'), api.get('/exhibitions/meta/filters')])
-      .then(([e, f]) => { setAll(e.data); setFilters(f.data); })
+    api.get('/exhibitions')
+      .then((e) => setAll(e.data))
       .finally(() => setLoading(false));
   }, []);
 
@@ -97,14 +79,6 @@ export default function Home() {
     () => inCity.find((e) => e.status === 'live') || inCity.find((e) => e.status === 'upcoming') || inCity[0],
     [inCity],
   );
-
-  const doSearch = () => {
-    const p = new URLSearchParams();
-    if (q) p.set('q', q);
-    if (loc) p.set('city', loc);
-    if (industry) p.set('industry', industry);
-    navigate(`/exhibitions?${p.toString()}`);
-  };
 
   if (loading) return <Spinner label="Loading exhibitions…" />;
 
@@ -153,40 +127,6 @@ export default function Home() {
           <path fill="currentColor" d="M0,52 C360,92 720,28 1080,52 C1260,64 1380,72 1440,68 L1440,90 L0,90 Z" />
         </svg>
       </section>
-
-      {/* ---------------- Search card (ux floating bar) ---------------- */}
-      <div className="container-px relative z-20 -mt-6 lg:-mt-10">
-          <div className="rounded-3xl border border-ink-100 bg-white p-5 shadow-soft">
-            <div className="mb-3 text-sm font-semibold text-ink-700">Search exhibitions, industry or keyword</div>
-            <div className="grid gap-3 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
-              <label className="flex items-center gap-2 rounded-xl border border-ink-200 px-3.5 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-100">
-                <Search width={18} className="shrink-0 text-ink-400" />
-                <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doSearch()}
-                  placeholder="e.g. Electronics, Machinery, Food…" className="w-full bg-transparent py-3 text-sm outline-none placeholder:text-ink-400" />
-              </label>
-              <SelectField icon={<MapPin width={17} className="text-ink-400" />} value={loc} onChange={setLoc}>
-                <option value="">All Cities</option>
-                {filters.cities.map((c) => <option key={c} value={c}>{c}</option>)}
-              </SelectField>
-              <label className="flex items-center gap-2 rounded-xl border border-ink-200 px-3.5 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-100">
-                <Calendar width={17} className="shrink-0 text-ink-400" />
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-transparent py-3 text-sm text-ink-600 outline-none" />
-              </label>
-              <SelectField icon={<Grid width={17} className="text-ink-400" />} value={industry} onChange={setIndustry}>
-                <option value="">All Industries</option>
-                {filters.industries.map((i) => <option key={i} value={i}>{i}</option>)}
-              </SelectField>
-              <button onClick={doSearch} className="btn-primary px-6 py-3">Search Now</button>
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-ink-400">Popular searches:</span>
-              {POPULAR.map((p) => (
-                <button key={p.label} onClick={() => { setCity(p.city); navigate(`/exhibitions?city=${encodeURIComponent(p.city)}`); }}
-                  className="rounded-full bg-ink-50 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:bg-brand-50 hover:text-brand-700">{p.label}</button>
-              ))}
-            </div>
-          </div>
-        </div>
 
       {/* ---------------- Live / Upcoming / Past (three sections) ---------------- */}
       <CityStatusSection
@@ -472,17 +412,6 @@ function CityStatusSection({
         </div>
       )}
     </section>
-  );
-}
-
-function SelectField({ icon, value, onChange, children }: { icon: React.ReactNode; value: string; onChange: (v: string) => void; children: React.ReactNode }) {
-  return (
-    <label className="flex items-center gap-2 rounded-xl border border-ink-200 px-3.5 focus-within:border-brand focus-within:ring-4 focus-within:ring-brand-100">
-      {icon}
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full bg-transparent py-3 text-sm text-ink-600 outline-none">
-        {children}
-      </select>
-    </label>
   );
 }
 

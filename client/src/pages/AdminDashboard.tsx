@@ -38,7 +38,10 @@ export default function AdminDashboard() {
           <h1 className="text-2xl font-extrabold text-slate-900">Organizer Dashboard</h1>
           <p className="text-sm text-slate-500">Welcome back, {user?.name}. Here's how your exhibitions are performing.</p>
         </div>
-        <Link to="/admin/floor-plan" className="btn-primary">Manage Floor Plans</Link>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/admin/events/new" className="btn-outline">Create event</Link>
+          <Link to="/admin/floor-plan" className="btn-primary">Create floor plan</Link>
+        </div>
       </div>
 
       {/* KPI cards */}
@@ -124,7 +127,10 @@ export default function AdminDashboard() {
 
       {/* Exhibitions management */}
       <div className="card mt-6 overflow-hidden">
-        <div className="border-b border-slate-100 p-5"><h3 className="text-sm font-bold text-slate-900">Manage Exhibitions</h3></div>
+        <div className="flex items-center justify-between border-b border-slate-100 p-5">
+          <h3 className="text-sm font-bold text-slate-900">Manage Exhibitions</h3>
+          <Link to="/admin/events/new" className="text-sm font-semibold text-brand-700 hover:underline">+ Create event</Link>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">

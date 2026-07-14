@@ -160,6 +160,12 @@ async function run() {
 
   // ---------------- Exhibitions (Bengaluru-heavy + other metros) ----------------
   const gallery = JSON.stringify(galleryPhotos.map((g) => img(g, 800, 500)));
+  const eventDocs = JSON.stringify([
+    { name: 'Visitor Guidelines.pdf', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', type: 'pdf' },
+    { name: 'Floor Plan Map.pdf', url: 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf', type: 'pdf' },
+    { name: 'Exhibitor Manual.pdf', url: 'https://www.africau.edu/images/default/sample.pdf', type: 'pdf' },
+    { name: 'Seminar Schedule.pdf', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', type: 'pdf' },
+  ]);
   const exhibitionDefs = [
     // ---- Bengaluru LIVE ----
     { slug: 'india-plast-2026', name: 'India Plast 2026', tagline: 'The Largest Plastics & Polymer Show', industry: 'Plastics', banner: banners.plast, ...VENUE.biec, org: 0, startOffset: -1, days: 4, status: 'live', price: 45000, visitorsToday: 4582, totalVisitors: 250000, tags: ['Trending', 'Most Booked', 'B2B'], b2b: 1, intl: 1, yt: DEMO_YT[0] },
@@ -206,15 +212,15 @@ async function run() {
     const end = addDays(start, e.days - 1);
     const r = await db.execute({
       sql: `INSERT INTO exhibitions
-        (slug,name,tagline,industry,about,banner,venue,city,lat,lng,organizer_id,start_date,end_date,status,price_from,visitors_today,total_visitors,entry_free,international,government,b2b,early_bird,tags,gallery,youtube_url,reel_url,address)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        (slug,name,tagline,industry,about,banner,venue,city,lat,lng,organizer_id,start_date,end_date,status,price_from,visitors_today,total_visitors,entry_free,international,government,b2b,early_bird,tags,gallery,documents,youtube_url,reel_url,address)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
         e.slug, e.name, e.tagline, e.industry,
-        `${e.name} brings together the entire ${e.industry.toLowerCase()} ecosystem under one roof at ${e.venue}, ${e.city}. Featuring live demonstrations, product launches, knowledge sessions and B2B networking for manufacturers, suppliers and buyers.`,
+        `${e.name} brings together the entire ${e.industry.toLowerCase()} ecosystem under one roof at ${e.venue}, ${e.city}. Featuring live demonstrations, product launches, knowledge sessions and B2B networking for manufacturers, suppliers and buyers. Visitors can explore interactive halls, meet exhibitors on the floor plan, and download event documents for an end-to-end experience.`,
         img(e.banner, 1200, 500), e.venue, e.city, e.lat, e.lng, organizerIds[e.org],
         iso(start), iso(end), e.status, e.price, e.visitorsToday, e.totalVisitors,
         e.entryFree ? 1 : 0, e.intl ? 1 : 0, e.gov ? 1 : 0, e.b2b ? 1 : 0, e.early ? 1 : 0,
-        JSON.stringify(e.tags), gallery, e.yt, 'https://www.instagram.com/reel/C6h0Zc9Iu0y/', e.address,
+        JSON.stringify(e.tags), gallery, eventDocs, e.yt, 'https://www.instagram.com/reel/C6h0Zc9Iu0y/', e.address,
       ],
     });
     exhibitionIds[e.slug] = Number(r.lastInsertRowid);
@@ -406,10 +412,12 @@ async function run() {
 
   // ---------------- Community media samples ----------------
   const mediaSamples = [
+    { kind: 'reel', url: 'https://www.instagram.com/reel/C6h0Zc9Iu0y/', caption: 'Opening day vibes', author: 'Ananya Krishnan' },
+    { kind: 'reel', url: 'https://www.youtube.com/shorts/aqz-KE-bpKQ', caption: 'Quick stall tour', author: 'Rohit Sharma' },
     { kind: 'video', url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', caption: 'Hall walkthrough on opening day', author: 'Rohit Sharma' },
     { kind: 'photo', url: img('photo-1540575467063-178a50c2df87', 800, 500), caption: 'Busy aisle in Hall A', author: 'Priya Nair' },
     { kind: 'photo', url: img('photo-1511578314322-379afb476865', 800, 500), caption: 'Keynote stage setup', author: 'Ananya Krishnan' },
-    { kind: 'video', url: 'https://www.youtube.com/watch?v=ScMzIvxBSi4', caption: 'Product demo highlight reel', author: 'Rajesh Verma' },
+    { kind: 'video', url: 'https://www.youtube.com/watch?v=ScMzIvxBSi4', caption: 'Product demo highlight', author: 'Rajesh Verma' },
   ];
   for (const e of exhibitionDefs.filter((x) => x.city === 'Bengaluru')) {
     const exId = exhibitionIds[e.slug];

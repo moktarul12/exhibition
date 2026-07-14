@@ -72,6 +72,7 @@ export const SCHEMA_STATEMENTS = [
     early_bird INTEGER DEFAULT 0,
     tags TEXT, -- JSON array of chips (Trending, New Launch, etc.)
     gallery TEXT, -- JSON array of image urls
+    documents TEXT, -- JSON array of {name,url,type}
     youtube_url TEXT,
     reel_url TEXT,
     address TEXT,
@@ -199,7 +200,7 @@ export const SCHEMA_STATEMENTS = [
     exhibition_id INTEGER NOT NULL,
     user_id INTEGER,
     author_name TEXT NOT NULL,
-    kind TEXT NOT NULL DEFAULT 'photo', -- photo | video
+    kind TEXT NOT NULL DEFAULT 'photo', -- photo | video | reel
     url TEXT NOT NULL,
     caption TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),

@@ -1,65 +1,76 @@
-import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { useCity } from '../city';
+import { api } from '../api';
 import { Logo } from './ui';
-import { Bell, Dashboard, LogOut, Menu, Ticket, X, ChevronDown, Building, Grid, MapPin, Check } from './icons';
-
-const NAV = [
-  { to: '/', label: 'Home', match: (p: string) => p === '/' },
-  { to: '/exhibitions', label: 'Exhibitions', match: (p: string) => p.startsWith('/exhibitions') },
-  { to: '/exhibitions', label: 'Venues', match: () => false },
-  { to: '/exhibitions', label: 'Floor Plan', match: () => false },
-  { to: '/#pricing', label: 'Pricing', match: () => false },
-];
-
-const RESOURCES = [
-  { to: '#', label: 'Blog' },
-  { to: '#', label: 'Help Center' },
-  { to: '#', label: 'Guides' },
-];
+import { Bell, Dashboard, LogOut, Menu, Ticket, X, ChevronDown, Building, Grid, MapPin, Check, Search, Calendar } from './icons';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
-  const [resOpen, setResOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [date, setDate] = useState('');
+  const [industry, setIndustry] = useState('');
+  const [industries, setIndustries] = useState<string[]>([]);
+
+  useEffect(() => {
+    api.get('/exhibitions/meta/filters')
+      .then((r) => setIndustries(r.data?.industries || []))
+      .catch(() => setIndustries([]));
+  }, []);
 
   const handleLogout = () => { logout(); navigate('/'); setUserMenu(false); };
 
+  const doSearch = () => {
+    const p = new URLSearchParams();
+    if (q.trim()) p.set('q', q.trim());
+    if (date) p.set('date', date);
+    if (industry) p.set('industry', industry);
+    navigate(`/exhibitions?${p.toString()}`);
+    setMenuOpen(false);
+  };
+
   return (
-    <header className="sticky top-0 z-40 border-b border-ink-100 bg-white/90 backdrop-blur-xl">
-      <div className="container-px flex h-[72px] items-center justify-between gap-4">
+    <header className="sticky top-0 z-40 border-b border-ink-100 bg-white/95 backdrop-blur-xl">
+      <div className="container-px flex h-[72px] items-center gap-3 lg:gap-4">
         <Link to="/" className="shrink-0"><Logo withTagline /></Link>
 
-        <nav className="hidden items-center gap-1 lg:flex">
-          {NAV.map((l) => {
-            const active = l.match(location.pathname);
-            return (
-              <Link key={l.label} to={l.to}
-                className={`relative rounded-lg px-3.5 py-2 text-[15px] font-semibold transition-colors ${active ? 'text-brand-600' : 'text-ink-600 hover:text-ink-900'}`}>
-                {l.label}
-                {active && <span className="absolute inset-x-3.5 -bottom-[22px] h-[3px] rounded-full bg-grad" />}
-              </Link>
-            );
-          })}
-          <div className="relative" onMouseEnter={() => setResOpen(true)} onMouseLeave={() => setResOpen(false)}>
-            <button className="flex items-center gap-1 rounded-lg px-3.5 py-2 text-[15px] font-semibold text-ink-600 hover:text-ink-900">
-              Resources <ChevronDown width={15} className="text-ink-400" />
-            </button>
-            {resOpen && (
-              <div className="absolute left-0 top-full w-44 overflow-hidden rounded-2xl border border-ink-100 bg-white py-1 shadow-soft">
-                {RESOURCES.map((r) => (
-                  <a key={r.label} href={r.to} className="block px-4 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50">{r.label}</a>
-                ))}
-              </div>
-            )}
-          </div>
-        </nav>
+        {/* Top search: keyword · date · industries */}
+        <div className="hidden min-w-0 flex-1 items-center gap-1.5 rounded-full border border-ink-200 bg-ink-50/60 p-1.5 md:flex">
+          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-white px-3 py-1.5 shadow-sm">
+            <Search width={16} className="shrink-0 text-ink-400" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+              placeholder="Search exhibitions…"
+              className="w-full min-w-0 bg-transparent text-sm text-ink-800 outline-none placeholder:text-ink-400"
+            />
+          </label>
+          <label className="hidden items-center gap-1.5 rounded-full bg-white px-3 py-1.5 shadow-sm lg:flex">
+            <Calendar width={15} className="shrink-0 text-ink-400" />
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-[9.5rem] bg-transparent text-sm text-ink-700 outline-none"
+            />
+          </label>
+          <select
+            value={industry}
+            onChange={(e) => setIndustry(e.target.value)}
+            className="hidden max-w-[11rem] rounded-full bg-white px-3 py-2 text-sm font-medium text-ink-700 shadow-sm outline-none lg:block"
+          >
+            <option value="">All industries</option>
+            {industries.map((i) => <option key={i} value={i}>{i}</option>)}
+          </select>
+          <button onClick={doSearch} className="btn-primary shrink-0 rounded-full px-4 py-2 text-sm">Search</button>
+        </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="ml-auto flex items-center gap-2.5">
           <CitySelector />
           {user ? (
             <>
@@ -88,7 +99,8 @@ export default function Navbar() {
                     {user.role === 'admin' && (
                       <>
                         <MenuItem to="/admin" icon={<Dashboard width={18} />} onClick={() => setUserMenu(false)}>Admin dashboard</MenuItem>
-                        <MenuItem to="/admin/floor-plan" icon={<Grid width={18} />} onClick={() => setUserMenu(false)}>Floor plans</MenuItem>
+                        <MenuItem to="/admin/events/new" icon={<Ticket width={18} />} onClick={() => setUserMenu(false)}>Create event</MenuItem>
+                        <MenuItem to="/admin/floor-plan" icon={<Grid width={18} />} onClick={() => setUserMenu(false)}>Create floor plan</MenuItem>
                       </>
                     )}
                     <button onClick={handleLogout} className="flex w-full items-center gap-2.5 px-4 py-3 text-sm font-medium text-brand-700 hover:bg-brand-50"><LogOut width={18} /> Logout</button>
@@ -102,28 +114,37 @@ export default function Navbar() {
               <Link to="/register" className="btn-primary">Sign Up</Link>
             </>
           )}
-          <button className="rounded-full p-2.5 text-ink-600 hover:bg-ink-50 lg:hidden" onClick={() => setMenuOpen((v) => !v)}>
+          <button className="rounded-full p-2.5 text-ink-600 hover:bg-ink-50 md:hidden" onClick={() => setMenuOpen((v) => !v)}>
             {menuOpen ? <X /> : <Menu />}
           </button>
         </div>
       </div>
 
       {menuOpen && (
-        <nav className="border-t border-ink-100 bg-white px-4 py-3 lg:hidden">
-          {NAV.map((l) => (
-            <Link key={l.label} to={l.to} onClick={() => setMenuOpen(false)}
-              className="block rounded-xl px-3 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50">{l.label}</Link>
-          ))}
-          {RESOURCES.map((r) => (
-            <a key={r.label} href={r.to} onClick={() => setMenuOpen(false)} className="block rounded-xl px-3 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50">{r.label}</a>
-          ))}
+        <div className="border-t border-ink-100 bg-white px-4 py-3 md:hidden">
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5">
+              <Search width={16} className="text-ink-400" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+                placeholder="Search exhibitions…" className="w-full bg-transparent text-sm outline-none" />
+            </label>
+            <label className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5">
+              <Calendar width={16} className="text-ink-400" />
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-transparent text-sm outline-none" />
+            </label>
+            <select value={industry} onChange={(e) => setIndustry(e.target.value)} className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm outline-none">
+              <option value="">All industries</option>
+              {industries.map((i) => <option key={i} value={i}>{i}</option>)}
+            </select>
+            <button onClick={doSearch} className="btn-primary w-full">Search</button>
+          </div>
           {!user && (
-            <div className="mt-2 flex gap-2 border-t border-ink-100 pt-3">
+            <div className="mt-3 flex gap-2 border-t border-ink-100 pt-3">
               <Link to="/login" onClick={() => setMenuOpen(false)} className="btn-outline flex-1">Login</Link>
               <Link to="/register" onClick={() => setMenuOpen(false)} className="btn-primary flex-1">Sign Up</Link>
             </div>
           )}
-        </nav>
+        </div>
       )}
     </header>
   );

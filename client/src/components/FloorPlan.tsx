@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, formatINR } from '../api';
 import type { Hall, Stall } from '../types';
 import { stallColors } from './ui';
 import { useAuth } from '../auth';
-import { Search, X, Check, Grid, Download } from './icons';
+import { Search, X, Check, Grid, Download, Phone, Mail, Globe, ArrowRight, Building } from './icons';
+import { toEmbedUrl } from '../media';
 
 export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; exhibitionName: string }) {
   const { user } = useAuth();
@@ -55,11 +56,12 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
 
   const cols = hall?.grid_cols ?? 8;
   const rowsN = hall?.grid_rows ?? 6;
+  const hasCompany = !!(selected?.company_id || selected?.company_name);
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_390px]">
-      <div className="card p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="grid gap-5 lg:grid-cols-[1fr_400px]">
+      <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-soft">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4">
           <select value={hallId ?? ''} onChange={(e) => { setHallId(Number(e.target.value)); setSelected(null); }} className="input w-auto rounded-full font-semibold">
             {halls.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
           </select>
@@ -69,7 +71,7 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
           </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-3 text-xs">
+        <div className="flex flex-wrap gap-3 px-5 pt-4 text-xs">
           {(Object.keys(stallColors) as (keyof typeof stallColors)[]).map((k) => (
             <div key={k} className="flex items-center gap-1.5">
               <span className={`h-3 w-3 rounded ${stallColors[k].legend}`} />
@@ -82,9 +84,9 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
         {loading ? (
           <div className="grid h-64 place-items-center text-ink-400">Loading floor plan…</div>
         ) : (
-          <div className="overflow-x-auto rounded-2xl bg-ink-50 p-4">
-            <div className="mx-auto" style={{ minWidth: cols * 62 }}>
-              <div className="mb-2 rounded-full bg-ink-200/60 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-ink-500">Entry</div>
+          <div className="overflow-x-auto p-5">
+            <div className="mx-auto rounded-2xl bg-gradient-to-b from-ink-50 to-white p-4" style={{ minWidth: cols * 62 }}>
+              <div className="mb-2 rounded-full bg-brand-600/90 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-white">Main entrance</div>
               <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }}>
                 {Array.from({ length: rowsN * cols }).map((_, idx) => {
                   const row = Math.floor(idx / cols);
@@ -98,24 +100,33 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
                   const isMatch = search && stall.code.includes(search);
                   const isSel = selected?.id === stall.id;
                   return (
-                    <button key={idx} onClick={() => openStall(stall)} title={`${stall.code} · ${c.label} · ${formatINR(stall.price)}`}
-                      className={`grid h-14 place-items-center rounded-xl border text-[11px] font-bold transition-all ${c.bg} ${c.border} ${c.text} ${isSel ? 'ring-2 ring-brand-600 ring-offset-2' : ''} ${isMatch ? 'ring-2 ring-brand-500 animate-pulse' : ''}`}>
-                      {stall.code}
+                    <button
+                      key={idx}
+                      onClick={() => openStall(stall)}
+                      title={stall.company_name ? `${stall.code} · ${stall.company_name}` : `${stall.code} · ${c.label}`}
+                      className={`relative grid h-14 place-items-center rounded-xl border text-[11px] font-bold transition-all hover:scale-[1.03] ${c.bg} ${c.border} ${c.text} ${isSel ? 'ring-2 ring-brand-600 ring-offset-2' : ''} ${isMatch ? 'ring-2 ring-brand-500 animate-pulse' : ''}`}
+                    >
+                      {stall.company_logo ? (
+                        <img src={stall.company_logo} alt="" className="h-7 w-7 rounded-md object-cover shadow-sm" />
+                      ) : stall.code}
+                      {stall.company_name && !stall.company_logo && <span className="absolute bottom-0.5 text-[7px] opacity-70">●</span>}
                     </button>
                   );
                 })}
               </div>
-              <div className="mt-2 rounded-full bg-ink-200/60 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-ink-500">Registration / Exit</div>
+              <div className="mt-2 rounded-full bg-ink-200/80 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-ink-500">Exit / registration</div>
             </div>
+            <p className="mt-3 text-center text-xs text-ink-400">Tap any stall to see the exhibitor company and details</p>
           </div>
         )}
       </div>
 
-      <div className="card sticky top-32 h-fit max-h-[calc(100vh-9rem)] overflow-y-auto p-5">
+      <div className="sticky top-28 h-fit max-h-[calc(100vh-8rem)] overflow-y-auto rounded-3xl border border-ink-100 bg-white p-5 shadow-soft">
         {!selected ? (
           <div className="grid place-items-center py-16 text-center text-ink-400">
-            <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-ink-50 text-ink-300"><Grid width={28} /></div>
-            <p className="text-sm">Select a stall on the floor plan to see details{canBook ? ' and book.' : '.'}</p>
+            <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-500"><Grid width={28} /></div>
+            <p className="text-sm font-medium text-ink-600">Select a stall</p>
+            <p className="mt-1 max-w-[220px] text-xs text-ink-400">See who’s exhibiting there, contact details and booth highlights.</p>
           </div>
         ) : confirmed ? (
           <div className="animate-fade-in text-center">
@@ -144,13 +155,58 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
               <button onClick={() => setSelected(null)} className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100"><X width={18} /></button>
             </div>
 
+            {/* Company-first panel for visitors */}
+            {hasCompany ? (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50/80 to-white">
+                <div className="flex items-center gap-3 p-4">
+                  <img src={selected.company_logo} alt="" className="h-14 w-14 rounded-2xl object-cover shadow-sm" />
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-brand-600">Exhibiting company</div>
+                    <div className="truncate font-display text-base font-extrabold text-ink-900">{selected.company_name}</div>
+                    {selected.company_industry && <div className="truncate text-xs text-ink-500">{selected.company_industry}</div>}
+                  </div>
+                </div>
+                {selected.company_about && (
+                  <p className="border-t border-brand-100/60 px-4 py-3 text-sm leading-relaxed text-ink-600 line-clamp-4">{selected.company_about}</p>
+                )}
+                <div className="space-y-2 border-t border-brand-100/60 px-4 py-3 text-sm text-ink-600">
+                  {selected.company_contact && <div className="flex items-center gap-2"><Building width={14} className="text-ink-400" /> {selected.company_contact}</div>}
+                  {selected.company_email && <div className="flex items-center gap-2"><Mail width={14} className="text-ink-400" /> {selected.company_email}</div>}
+                  {selected.company_phone && <div className="flex items-center gap-2"><Phone width={14} className="text-ink-400" /> {selected.company_phone}</div>}
+                  {selected.company_website && <div className="flex items-center gap-2"><Globe width={14} className="text-ink-400" /> {selected.company_website}</div>}
+                  {selected.company_city && <div className="text-xs text-ink-400">Based in {selected.company_city}</div>}
+                </div>
+                {selected.company_id && (
+                  <div className="border-t border-brand-100/60 p-3">
+                    <Link to={`/company/${selected.company_id}`} className="btn-primary w-full text-sm">
+                      View full company profile <ArrowRight width={15} />
+                    </Link>
+                  </div>
+                )}
+                {toEmbedUrl(selected.company_youtube || selected.youtube_url) && (
+                  <div className="border-t border-brand-100/60 p-3">
+                    <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-ink-400">Company video</div>
+                    <div className="aspect-video overflow-hidden rounded-xl bg-ink-950">
+                      <iframe title="Company video" src={toEmbedUrl(selected.company_youtube || selected.youtube_url)!} className="h-full w-full border-0" allowFullScreen />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-dashed border-ink-200 bg-ink-50 px-4 py-6 text-center">
+                <Building width={22} className="mx-auto text-ink-300" />
+                <p className="mt-2 text-sm font-medium text-ink-600">No company assigned yet</p>
+                <p className="mt-1 text-xs text-ink-400">{stallColors[selected.status].label} stall</p>
+              </div>
+            )}
+
             <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
               <Info label="Size" value={`${selected.width}m × ${selected.depth}m`} />
               <Info label="Area" value={`${selected.area} Sq.m`} />
               <Info label="Type" value={selected.type} />
               <Info label="Zone" value={selected.zone} />
               <Info label="Status" value={<span className={stallColors[selected.status].text + ' font-semibold'}>{stallColors[selected.status].label}</span>} />
-              <Info label="Price" value={<span className="font-bold text-ink-900">{formatINR(selected.price)}</span>} />
+              {canBook && <Info label="Price" value={<span className="font-bold text-ink-900">{formatINR(selected.price)}</span>} />}
             </dl>
 
             {selected.description && <p className="mt-4 text-sm leading-relaxed text-ink-600">{selected.description}</p>}
@@ -160,15 +216,6 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
                 <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-ink-400">Facilities</div>
                 <div className="flex flex-wrap gap-1.5">
                   {selected.facilities.map((f) => <span key={f} className="rounded-full bg-ink-100 px-2.5 py-1 text-[11px] font-medium text-ink-700">{f}</span>)}
-                </div>
-              </div>
-            )}
-
-            {selected.youtube_url && (
-              <div className="mt-4">
-                <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-ink-400">Stall walkthrough</div>
-                <div className="aspect-video overflow-hidden rounded-2xl bg-ink-950">
-                  <iframe title={`Stall ${selected.code} video`} src={selected.youtube_url} className="h-full w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
                 </div>
               </div>
             )}
@@ -191,18 +238,11 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
               </div>
             )}
 
-            {selected.company_name && (
-              <div className="mt-4 flex items-center gap-2.5 rounded-2xl bg-ink-50 p-3">
-                <img src={selected.company_logo} alt="" className="h-9 w-9 rounded-lg" />
-                <div className="text-sm"><div className="text-[11px] text-ink-400">Occupied by</div><div className="font-semibold text-ink-700">{selected.company_name}</div></div>
-              </div>
-            )}
-
             {selected.nearby && selected.nearby.length > 0 && (
               <div className="mt-3 text-xs text-ink-500">Nearby: {selected.nearby.map((n) => n.code).join(', ')}</div>
             )}
 
-            {selected.status === 'available' && canBook ? (
+            {canBook && selected.status === 'available' && (
               <div className="mt-5">
                 <div className="mb-3 border-t border-ink-100 pt-4 font-display text-sm font-bold text-ink-900">Book this stall</div>
                 <div className="space-y-2.5">
@@ -220,13 +260,10 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
                 </div>
                 <button onClick={submitBooking} disabled={booking} className="btn-primary mt-3 w-full">{booking ? 'Processing…' : 'Confirm booking'}</button>
               </div>
-            ) : selected.status === 'available' ? (
+            )}
+            {!canBook && selected.status === 'available' && (
               <div className="mt-5 rounded-2xl border border-dashed border-ink-200 p-4 text-center text-sm text-ink-500">
-                Guests and visitors can view stall details. <button onClick={() => navigate('/login')} className="font-semibold text-brand-700 underline">Login as exhibitor</button> to book.
-              </div>
-            ) : (
-              <div className="mt-5 rounded-2xl border border-dashed border-ink-200 p-4 text-center text-sm text-ink-500">
-                This stall is <b>{stallColors[selected.status].label.toLowerCase()}</b> and not available for booking.
+                Want this stall for your brand? <button onClick={() => navigate('/login')} className="font-semibold text-brand-700 underline">Login as exhibitor</button> to book.
               </div>
             )}
           </div>
