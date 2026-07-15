@@ -14,6 +14,7 @@ import AdminEventForm from './pages/AdminEventForm';
 import AdminDiscoverEvents from './pages/AdminDiscoverEvents';
 import CompanyProfile from './pages/CompanyProfile';
 import CompanyDashboard from './pages/CompanyDashboard';
+import Marketing from './pages/Marketing';
 import NotFound from './pages/NotFound';
 
 export default function App() {
@@ -23,6 +24,8 @@ export default function App() {
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/product" element={<Marketing />} />
+          <Route path="/marketing" element={<Marketing />} />
           <Route path="/exhibitions" element={<Exhibitions />} />
           <Route path="/exhibitions/:slug" element={<ExhibitionDetail />} />
           <Route path="/company/:id" element={<CompanyProfile />} />

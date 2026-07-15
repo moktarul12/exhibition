@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api, formatINR } from '../api';
 import type { Exhibition, FloorMarker, FloorMarkerKind, Hall, Stall, StallDisplaySize } from '../types';
 import { Spinner, stallColors } from '../components/ui';
-import { ArrowRight, Grid, Ticket, X, ChevronDown, Plus, Trash2, Move, Copy, RefreshCw } from '../components/icons';
+import { Grid, Ticket, X, Plus, Trash2, Move, RefreshCw } from '../components/icons';
 import { hallMarkers, hallRowLayout, layoutStallTotal, MARKER_META, SIZE_META, stallSpans } from '../floorLayout';
 
 const PRESETS: { label: string; layout: number[] }[] = [
@@ -118,7 +118,6 @@ export default function AdminFloorPlan() {
   const [stallDirty, setStallDirty] = useState(false);
   /** Draft size (not saved until Apply) */
   const [draftMergeId, setDraftMergeId] = useState('1x1');
-  const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
   /** When edits are unsaved and user clicks another stall — choose Discard / Save on the right panel */
   const [pendingNextStall, setPendingNextStall] = useState<Stall | null>(null);
   const [msg, setMsg] = useState('');
@@ -127,8 +126,7 @@ export default function AdminFloorPlan() {
   const [attachUrl, setAttachUrl] = useState('');
   const [attachMode, setAttachMode] = useState<'attached' | 'interactive' | 'both'>('both');
   const [aiBusy, setAiBusy] = useState(false);
-  const [showToolbar, setShowToolbar] = useState(true);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showHallSettings, setShowHallSettings] = useState(false);
   const [dragPreview, setDragPreview] = useState<{ row: number; col: number; spanCols: number; spanRows: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const lastSelectedId = useRef<number | null>(null);
@@ -243,7 +241,6 @@ export default function AdminFloorPlan() {
     } else {
       setDraftMergeId('1x1');
     }
-    setSizeMenuOpen(false);
   };
 
   const selectStall = (stall: Stall, e?: React.MouseEvent) => {
@@ -303,7 +300,6 @@ export default function AdminFloorPlan() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isDragging) {
-        if (sizeMenuOpen) { setSizeMenuOpen(false); return; }
         if (selected || selectedMarkerId || selectedIds.size) {
           clearSelection();
           return;
@@ -342,7 +338,7 @@ export default function AdminFloorPlan() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDragging, dragPreview, hoverCell, rowsN, maxCols, selected, selectedMarkerId, selectedIds, sizeMenuOpen]);
+  }, [isDragging, dragPreview, hoverCell, rowsN, maxCols, selected, selectedMarkerId, selectedIds]);
 
   const occupied = useMemo(() => {
     const set = new Set<string>();
@@ -863,15 +859,9 @@ export default function AdminFloorPlan() {
     }
   };
 
-  const applyStallSize = async (size: StallDisplaySize) => {
-    const hit = MERGE_SIZES.find((m) => m.display === size) || MERGE_SIZES[0];
-    setDraftMergeId(hit.id);
-  };
-
   /** Commit draft merge size to the plan (not auto — requires Apply) */
   const applyMerge = async (m?: (typeof MERGE_SIZES)[number]) => {
     const target = m || MERGE_SIZES.find((x) => x.id === draftMergeId) || MERGE_SIZES[0];
-    setSizeMenuOpen(false);
 
     if (selectedMarkerId) {
       setDraftMergeId(target.id);
@@ -1185,7 +1175,6 @@ export default function AdminFloorPlan() {
       setMarkerPaint({ span_cols: hitMarker.span_cols || 1, span_rows: hitMarker.span_rows || 1 });
       const hit = MERGE_SIZES.find((x) => x.span_cols === (hitMarker.span_cols || 1) && x.span_rows === (hitMarker.span_rows || 1));
       setDraftMergeId(hit?.id || '1x1');
-      setSizeMenuOpen(false);
       return;
     }
 
@@ -1330,30 +1319,42 @@ export default function AdminFloorPlan() {
     </span>
   );
 
+  const inspectorMode = selectedIds.size > 1
+    ? 'multi'
+    : selected
+      ? 'stall'
+      : selectedMarkerId
+        ? 'amenity'
+        : 'place';
+
+  const PanelHead = ({ title, hint }: { title: string; hint?: string }) => (
+    <div className="mb-2">
+      <div className="text-[11px] font-bold uppercase tracking-wide text-ink-400">{title}</div>
+      {hint && <p className="mt-0.5 text-[11px] leading-snug text-ink-500">{hint}</p>}
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Modern Header */}
-      <header className="sticky top-0 z-40 border-b border-white/20 bg-white/80 backdrop-blur-xl">
-        <div className="container-px flex items-center justify-between py-4">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="font-display text-2xl font-extrabold text-slate-900">Floor Plan Editor</h1>
-              <p className="text-sm text-slate-500">Design your exhibition layout</p>
-            </div>
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col bg-ink-50">
+      {/* Toolbar */}
+      <header className="shrink-0 border-b border-ink-100 bg-white">
+        <div className="container-px flex flex-wrap items-center justify-between gap-3 py-3">
+          <div className="min-w-0">
+            <p className="eyebrow mb-0.5">Admin</p>
+            <h1 className="font-display text-lg font-extrabold text-ink-900">Floor plan editor</h1>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <select 
-              value={selectedSlug} 
-              onChange={(e) => setSelectedSlug(e.target.value)} 
-              className="input min-w-[200px] border-slate-200 bg-white py-2.5 text-sm font-semibold shadow-sm"
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={selectedSlug}
+              onChange={(e) => setSelectedSlug(e.target.value)}
+              className="input w-auto min-w-[11rem] py-2 text-sm font-semibold"
             >
               {exhibitions.map((e) => <option key={e.id} value={e.slug}>{e.name}</option>)}
             </select>
-            <select 
-              value={hallId ?? ''} 
-              onChange={(e) => setHallId(Number(e.target.value))} 
-              className="input border-slate-200 bg-white py-2.5 text-sm shadow-sm"
+            <select
+              value={hallId ?? ''}
+              onChange={(e) => setHallId(Number(e.target.value))}
+              className="input w-auto min-w-[9rem] py-2 text-sm"
             >
               {halls.length === 0 && <option value="">No halls</option>}
               {halls.map((h) => {
@@ -1361,828 +1362,548 @@ export default function AdminFloorPlan() {
                 return <option key={h.id} value={h.id}>{h.name} · {L.join('-')}</option>;
               })}
             </select>
-            <button 
-              onClick={() => setShowNewHall(true)} 
-              disabled={!selectedSlug}
-              className="btn-primary flex items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-2.5 text-sm font-semibold shadow-lg shadow-brand-500/20"
-            >
-              <Plus width={16} /> New Hall
+            <button onClick={() => setShowNewHall(true)} disabled={!selectedSlug} className="btn-primary py-2 text-sm">
+              <Plus width={15} /> Hall
             </button>
-            <div className="flex gap-2">
-              {selectedSlug && <Link to={`/admin/events/${selectedSlug}/edit`} className="btn-outline flex items-center gap-2 border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm"><Ticket width={15} /> Event</Link>}
-              <Link to="/admin" className="btn-outline flex items-center gap-2 border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm">Dashboard</Link>
-            </div>
+            {selectedSlug && (
+              <Link to={`/admin/events/${selectedSlug}/edit`} className="btn-outline py-2 text-sm">
+                <Ticket width={14} /> Event
+              </Link>
+            )}
+            <Link to="/admin" className="btn-ghost py-2 text-sm">Dashboard</Link>
           </div>
         </div>
       </header>
 
-      <main className="container-px py-6">
-        {msg && (
-          <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-sm">
+      {msg && (
+        <div className="container-px pt-3">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-800">
             {msg}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Attached Map Section - Collapsible */}
-        <details className="mb-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <summary className="cursor-pointer px-5 py-4 font-display text-sm font-bold text-slate-800 hover:bg-slate-50">
-            📎 Attached Floor Plan Image
+      <main className="container-px flex min-h-0 flex-1 flex-col gap-3 py-4">
+        {/* Secondary tools — collapsed by default */}
+        <details className="shrink-0 rounded-2xl border border-ink-100 bg-white">
+          <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50">
+            Attached map & AI import
           </summary>
-          <div className="space-y-4 border-t border-slate-100 px-5 pb-5 pt-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <select 
-                className="input border-slate-200" 
-                value={attachMode} 
-                onChange={(e) => setAttachMode(e.target.value as typeof attachMode)}
-              >
-                <option value="both">Both — map + interactive</option>
-                <option value="attached">Attached only</option>
-                <option value="interactive">Interactive only</option>
+          <div className="space-y-3 border-t border-ink-100 px-4 pb-4 pt-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <select className="input py-2 text-sm" value={attachMode} onChange={(e) => setAttachMode(e.target.value as typeof attachMode)}>
+                <option value="both">Map + interactive grid</option>
+                <option value="attached">Attached image only</option>
+                <option value="interactive">Interactive grid only</option>
               </select>
-              <input 
-                className="input border-slate-200" 
-                value={attachUrl} 
-                onChange={(e) => setAttachUrl(e.target.value)} 
-                placeholder="/sample-floor-plan.png" 
-              />
+              <input className="input py-2 text-sm" value={attachUrl} onChange={(e) => setAttachUrl(e.target.value)} placeholder="Image URL or upload below" />
             </div>
-            <div className="flex flex-wrap gap-3">
-              <label className="btn-outline cursor-pointer border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm">
-                Upload Image
-                <input 
-                  type="file" 
-                  accept="image/*,application/pdf" 
-                  className="hidden" 
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file || file.size > 8_000_000) return;
-                    const reader = new FileReader();
-                    reader.onload = () => setAttachUrl(String(reader.result || ''));
-                    reader.readAsDataURL(file);
-                  }} 
-                />
+            <div className="flex flex-wrap gap-2">
+              <label className="btn-outline cursor-pointer py-2 text-sm">
+                Upload
+                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file || file.size > 8_000_000) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setAttachUrl(String(reader.result || ''));
+                  reader.readAsDataURL(file);
+                }} />
               </label>
-              <button 
-                onClick={saveAttachedPlan} 
-                disabled={saving || !selectedSlug} 
-                className="btn-outline border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm"
-              >
-                Save Map
-              </button>
-              <button 
-                onClick={generateFromAi} 
-                disabled={aiBusy || saving || !selectedSlug || !attachUrl} 
-                className="btn-primary bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-2.5 text-sm font-semibold shadow-lg shadow-brand-500/20"
-              >
-                {aiBusy ? <RefreshCw width={16} className="animate-spin" /> : '✨ AI Generate Floor Plan'}
+              <button onClick={saveAttachedPlan} disabled={saving || !selectedSlug} className="btn-outline py-2 text-sm">Save map</button>
+              <button onClick={generateFromAi} disabled={aiBusy || saving || !selectedSlug || !attachUrl} className="btn-primary py-2 text-sm">
+                {aiBusy ? <RefreshCw width={14} className="animate-spin" /> : 'AI generate layout'}
               </button>
             </div>
           </div>
         </details>
 
-        {/* New Hall Creation Modal */}
         {showNewHall && (
-          <div className="mb-6 rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-white p-6 shadow-lg">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-xl font-bold text-slate-900">Create New Hall</h3>
-              <button 
-                onClick={() => setShowNewHall(false)} 
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X width={20} />
-              </button>
+          <div className="shrink-0 rounded-2xl border border-brand-200 bg-brand-soft/40 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-display font-bold text-ink-900">New hall</h3>
+              <button type="button" onClick={() => setShowNewHall(false)} className="rounded-lg p-1.5 text-ink-400 hover:bg-white"><X width={18} /></button>
             </div>
-            <input 
-              className="input mb-4 max-w-md border-slate-200 bg-white shadow-sm" 
-              placeholder="Hall name (e.g., Main Hall, Hall A)" 
-              value={hallForm.name} 
-              onChange={(e) => setHallForm({ ...hallForm, name: e.target.value })} 
-            />
-            <div className="mb-4">
-              <div className="mb-2 text-sm font-semibold text-slate-700">Quick Layouts</div>
-              <div className="flex flex-wrap gap-2">
-                {PRESETS.map((p) => (
-                  <button 
-                    key={p.label} 
-                    type="button" 
-                    onClick={() => setHallForm({ ...hallForm, rowCounts: p.layout.map(String) })}
-                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold shadow-sm hover:border-brand-300 hover:bg-brand-50"
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+            <input className="input mb-3 max-w-sm py-2 text-sm" placeholder="Hall name" value={hallForm.name} onChange={(e) => setHallForm({ ...hallForm, name: e.target.value })} />
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {PRESETS.map((p) => (
+                <button key={p.label} type="button" onClick={() => setHallForm({ ...hallForm, rowCounts: p.layout.map(String) })}
+                  className="rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-semibold hover:border-brand-300">{p.label}</button>
+              ))}
             </div>
-            <div className="mb-4">
-              <div className="mb-2 text-sm font-semibold text-slate-700">Custom Layout (stalls per row)</div>
-              <div className="flex flex-wrap gap-2">
-                {hallForm.rowCounts.map((count, i) => (
-                  <input 
-                    key={i} 
-                    className="input w-16 border-slate-200 bg-white text-center shadow-sm" 
-                    type="number" 
-                    min={1} 
-                    max={24} 
-                    value={count}
-                    onChange={(e) => { const next = [...hallForm.rowCounts]; next[i] = e.target.value; setHallForm({ ...hallForm, rowCounts: next }); }} 
-                  />
-                ))}
-                <button 
-                  type="button" 
-                  onClick={() => setHallForm({ ...hallForm, rowCounts: [...hallForm.rowCounts, '6'] })} 
-                  className="rounded-xl border-2 border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-brand-400 hover:text-brand-600"
-                >
-                  + Add Row
-                </button>
-              </div>
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              {hallForm.rowCounts.map((count, i) => (
+                <input key={i} className="input w-14 py-1.5 text-center text-sm" type="number" min={1} max={24} value={count}
+                  onChange={(e) => { const next = [...hallForm.rowCounts]; next[i] = e.target.value; setHallForm({ ...hallForm, rowCounts: next }); }} />
+              ))}
+              <button type="button" onClick={() => setHallForm({ ...hallForm, rowCounts: [...hallForm.rowCounts, '6'] })} className="rounded-lg border border-dashed border-ink-300 px-2 py-1 text-xs font-semibold">+ row</button>
             </div>
-            <button 
-              onClick={createHall} 
-              disabled={saving} 
-              className="btn-primary bg-gradient-to-r from-brand-600 to-brand-700 px-6 py-3 text-base font-semibold shadow-lg shadow-brand-500/20"
-            >
-              {saving ? 'Creating...' : `Create Hall with ${layoutStallTotal(hallForm.rowCounts.map((v) => Number(v) || 0).filter((n) => n > 0))} Stalls`}
+            <button onClick={createHall} disabled={saving} className="btn-primary text-sm">
+              Create {layoutStallTotal(hallForm.rowCounts.map((v) => Number(v) || 0).filter((n) => n > 0))} stalls
             </button>
           </div>
         )}
 
-        {/* Empty State */}
         {halls.length === 0 ? (
-          <div className="rounded-3xl border-2 border-dashed border-slate-300 bg-white px-8 py-20 text-center shadow-sm">
-            <div className="mx-auto mb-4 grid h-20 w-20 place-items-center rounded-full bg-slate-100 text-slate-400">
-              <Grid width={36} />
-            </div>
-            <h3 className="font-display text-2xl font-bold text-slate-900">No Floor Plan Yet</h3>
-            <p className="mt-2 text-slate-500">Create your first hall to start designing the exhibition layout</p>
-            <button 
-              onClick={() => setShowNewHall(true)} 
-              className="btn-primary mt-6 bg-gradient-to-r from-brand-600 to-brand-700 px-8 py-3 text-base font-semibold shadow-lg shadow-brand-500/20"
-            >
-              <Plus width={18} className="mr-2" /> Create First Hall
-            </button>
+          <div className="card flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+            <div className="mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-ink-100 text-ink-400"><Grid width={28} /></div>
+            <h3 className="font-display text-xl font-bold text-ink-900">No hall yet</h3>
+            <p className="mt-1 max-w-sm text-sm text-ink-500">Create a hall to start placing stalls and amenities on the grid.</p>
+            <button onClick={() => setShowNewHall(true)} className="btn-primary mt-5 text-sm"><Plus width={16} /> Create hall</button>
           </div>
         ) : (
-          <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
-            {/* Main Floor Plan Grid */}
-            <div className="card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
-              {/* Hall Controls Bar */}
+          <div className="flex min-h-0 flex-1 gap-4 max-xl:flex-col">
+            {/* Canvas */}
+            <div className="card flex min-h-[420px] min-w-0 flex-1 flex-col overflow-hidden p-0 xl:min-h-0">
               {hall && (
-                <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-4">
-                  <input 
-                    className="input max-w-[160px] border-slate-200 bg-white text-sm shadow-sm" 
-                    value={hallNameEdit} 
-                    onChange={(e) => setHallNameEdit(e.target.value)} 
-                    placeholder="Hall name" 
-                  />
-                  <div className="h-6 w-px bg-slate-300" />
-                  <input 
-                    className="input max-w-[120px] border-slate-200 bg-white text-sm shadow-sm" 
-                    value={entranceLabel} 
-                    onChange={(e) => setEntranceLabel(e.target.value)} 
-                    placeholder="Entrance" 
-                  />
-                  <input 
-                    className="input max-w-[120px] border-slate-200 bg-white text-sm shadow-sm" 
-                    value={exitLabel} 
-                    onChange={(e) => setExitLabel(e.target.value)} 
-                    placeholder="Exit" 
-                  />
-                  <button 
-                    onClick={renameHall} 
-                    disabled={saving} 
-                    className="btn-outline border-slate-200 bg-white px-3 py-2 text-sm font-semibold shadow-sm"
-                  >
-                    Save
+                <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink-100 px-4 py-2.5">
+                  <input className="input w-36 py-1.5 text-sm font-semibold" value={hallNameEdit} onChange={(e) => setHallNameEdit(e.target.value)} placeholder="Hall name" />
+                  <button type="button" onClick={() => setShowHallSettings((v) => !v)} className="btn-outline py-1.5 text-xs">
+                    {showHallSettings ? 'Hide layout' : 'Layout & labels'}
                   </button>
-                  <div className="h-6 w-px bg-slate-300" />
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-500">Rows:</span>
-                    {layoutEdit.map((count, i) => (
-                      <input 
-                        key={i} 
-                        className="input w-10 border-slate-200 bg-white px-1 text-center text-xs shadow-sm" 
-                        type="number" 
-                        min={1} 
-                        max={24} 
-                        value={count}
-                        onChange={(e) => { const next = [...layoutEdit]; next[i] = e.target.value; setLayoutEdit(next); }} 
-                      />
-                    ))}
-                  </div>
-                  <button 
-                    onClick={applyLayout} 
-                    disabled={saving} 
-                    className="btn-outline border-slate-200 bg-white px-3 py-2 text-sm font-semibold shadow-sm"
-                  >
-                    Apply
-                  </button>
-                  <button 
-                    onClick={deleteHall} 
-                    disabled={saving} 
-                    className="ml-auto rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
-                  >
-                    <Trash2 width={14} className="mr-1" /> Delete
+                  <button onClick={renameHall} disabled={saving} className="btn-outline py-1.5 text-xs">Save hall</button>
+                  <button onClick={deleteHall} disabled={saving} className="ml-auto rounded-lg px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50">
+                    <Trash2 width={13} className="inline" /> Delete hall
                   </button>
                 </div>
               )}
 
-              {/* Current Tool Indicator */}
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-1.5 text-xs font-bold text-white shadow-md">
-                    {PLACE_OPTIONS.find((o) => o.value === currentTypeValue)?.icon || '🏪'} {PLACE_OPTIONS.find((o) => o.value === currentTypeValue)?.label || 'Stall'}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">
-                    {currentMerge.label}
-                  </span>
-                  {selected && (
-                    <span className="rounded-full bg-brand-50 px-3 py-1.5 text-xs font-bold text-brand-700">
-                      {selected.code}
-                    </span>
-                  )}
-                  {selectedMarkerId && (
-                    <span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700">
-                      Amenity
-                    </span>
-                  )}
+              {showHallSettings && hall && (
+                <div className="shrink-0 border-b border-ink-100 bg-ink-50/60 px-4 py-3">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <label className="block text-xs">
+                      <span className="mb-1 block font-semibold text-ink-500">Entrance label</span>
+                      <input className="input py-1.5 text-sm" value={entranceLabel} onChange={(e) => setEntranceLabel(e.target.value)} />
+                    </label>
+                    <label className="block text-xs">
+                      <span className="mb-1 block font-semibold text-ink-500">Exit label</span>
+                      <input className="input py-1.5 text-sm" value={exitLabel} onChange={(e) => setExitLabel(e.target.value)} />
+                    </label>
+                    <div className="sm:col-span-2">
+                      <span className="mb-1 block text-xs font-semibold text-ink-500">Stalls per row</span>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {layoutEdit.map((count, i) => (
+                          <input key={i} className="input w-11 py-1.5 text-center text-xs" type="number" min={1} max={24} value={count}
+                            onChange={(e) => { const next = [...layoutEdit]; next[i] = e.target.value; setLayoutEdit(next); }} />
+                        ))}
+                        <button onClick={applyLayout} disabled={saving} className="btn-outline py-1.5 text-xs">Apply layout</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xs text-slate-500">
-                  {stalls.length} stalls · {markers.items.length} amenities
+              )}
+
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ink-100 px-4 py-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="pill bg-ink-900 text-white">
+                    {PLACE_OPTIONS.find((o) => o.value === currentTypeValue)?.icon}{' '}
+                    {PLACE_OPTIONS.find((o) => o.value === currentTypeValue)?.label || 'Stall'}
+                  </span>
+                  <span className="pill border border-ink-200 bg-white text-ink-600">{currentMerge.label}</span>
+                  {selected && <span className="pill border border-brand-200 bg-brand-soft text-brand-700">{selected.code}</span>}
+                </div>
+                <span className="text-[11px] font-medium text-ink-400">{stalls.length} stalls · {markers.items.length} amenities</span>
+              </div>
+
+              <div className="relative min-h-0 flex-1 overflow-auto bg-[linear-gradient(to_bottom,#f8f7fb,white)] p-4">
+                <div className="flex justify-center">
+                  <div className="inline-block rounded-2xl border border-ink-100 bg-white p-4 shadow-sm">
+                    <div className="mb-2 rounded-lg bg-ink-900 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-white">
+                      {entranceLabel}
+                    </div>
+                    <div
+                      className="relative"
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${maxCols}, ${CELL}px)`,
+                        gridTemplateRows: `repeat(${rowsN}, ${CELL}px)`,
+                        gap: GAP,
+                        width: maxCols * CELL + (maxCols - 1) * GAP,
+                      }}
+                    >
+                      {Array.from({ length: rowsN * maxCols }).map((_, idx) => {
+                        const row = Math.floor(idx / maxCols);
+                        const col = idx % maxCols;
+                        const inLayout = col < (layout[row] || 0);
+                        const key = `${row}:${col}`;
+                        const isOcc = occupied.has(key);
+                        const inPreview = previewCells.has(key);
+                        if (!inLayout) return <div key={key} style={cellStyle(row, col)} />;
+                        const isOriginStall = stalls.some((s) => s.grid_row === row && s.grid_col === col);
+                        const isOriginMarker = markers.items.some((m) => m.grid_row === row && m.grid_col === col);
+                        if (isOriginStall || isOriginMarker) return <div key={key} style={cellStyle(row, col)} />;
+                        if (isOcc) {
+                          return <div key={key} style={cellStyle(row, col)} className={`pointer-events-none rounded-md ${inPreview ? 'bg-brand-200/50 ring-1 ring-brand-400' : ''}`} />;
+                        }
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            style={cellStyle(row, col)}
+                            onClick={() => onCellAction(row, col)}
+                            disabled={saving}
+                            onMouseEnter={() => setHoverCell({ row, col })}
+                            onMouseLeave={() => setHoverCell((h) => (h?.row === row && h?.col === col ? null : h))}
+                            onDragOver={(e) => onDragOverCell(e, row, col)}
+                            onDragLeave={() => setDragOver((d) => (d === key ? null : d))}
+                            onDrop={(e) => onDropCell(e, row, col)}
+                            className={`rounded-md border border-dashed text-[10px] font-semibold transition-colors ${
+                              dragOver === key || inPreview
+                                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                : 'border-ink-200 bg-ink-50/50 text-ink-300 hover:border-brand-300 hover:bg-brand-soft/30'
+                            }`}
+                          >
+                            +
+                          </button>
+                        );
+                      })}
+
+                      {stalls.map((stall) => {
+                        const { span_cols, span_rows } = stallSpans(stall);
+                        const c = stallColors[stall.status];
+                        const isSel = selectedIds.has(stall.id) || selected?.id === stall.id;
+                        const isPending = pendingNextStall?.id === stall.id;
+                        const isBeingDragged = isDragging && (selectedIds.has(stall.id) || selected?.id === stall.id);
+                        const willAbsorb = footprintAbsorbIds.has(stall.id);
+                        return (
+                          <button
+                            key={stall.id}
+                            type="button"
+                            draggable={!stallDirty || selected?.id === stall.id}
+                            onDragStart={(e) => onDragStart(e, { type: 'stall', id: stall.id })}
+                            onDragEnd={onDragEnd}
+                            onClick={(e) => selectStall(stall, e)}
+                            onDragOver={(e) => onDragOverCell(e, stall.grid_row, stall.grid_col)}
+                            onDrop={(e) => onDropCell(e, stall.grid_row, stall.grid_col)}
+                            style={cellStyle(stall.grid_row, stall.grid_col, span_cols, span_rows)}
+                            className={`relative z-10 grid cursor-grab place-items-center rounded-lg border font-bold active:cursor-grabbing ${c.bg} ${c.border} ${c.text} ${
+                              isPending ? 'ring-2 ring-amber-500 ring-offset-1'
+                                : isSel ? 'z-20 ring-2 ring-brand-600 ring-offset-1'
+                                : willAbsorb ? 'z-20 ring-2 ring-amber-400 ring-offset-1 opacity-75'
+                                : ''
+                            } ${isBeingDragged ? 'opacity-40' : ''} ${span_cols * span_rows > 1 ? 'text-[11px]' : 'text-[10px]'}`}
+                          >
+                            <span className="px-1 text-center leading-tight">{stall.code}</span>
+                            {willAbsorb && (
+                              <span className="absolute inset-x-0 top-0 rounded-t-md bg-amber-500 py-px text-center text-[7px] font-bold uppercase text-white">Merge</span>
+                            )}
+                          </button>
+                        );
+                      })}
+
+                      {markers.items.map((m) => {
+                        const meta = MARKER_META[m.kind] || MARKER_META.custom;
+                        const isBeingDragged = isDragging && selectedMarkerId === m.id;
+                        const inBlockedFoot = selectionFootprint.some(
+                          (cell) => cell.kind === 'blocked'
+                            && cell.row >= m.grid_row && cell.row < m.grid_row + (m.span_rows || 1)
+                            && cell.col >= m.grid_col && cell.col < m.grid_col + (m.span_cols || 1),
+                        );
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            draggable
+                            onDragStart={(e) => onDragStart(e, { type: 'marker', id: m.id })}
+                            onDragEnd={onDragEnd}
+                            onClick={() => {
+                              setSelectedMarkerId(m.id);
+                              setSelected(null);
+                              setSelectedIds(new Set());
+                              setPlaceTool({ kind: 'marker', marker: m.kind });
+                              setMarkerPaint({ span_cols: m.span_cols || 1, span_rows: m.span_rows || 1 });
+                              const hit = MERGE_SIZES.find((x) => x.span_cols === (m.span_cols || 1) && x.span_rows === (m.span_rows || 1));
+                              setDraftMergeId(hit?.id || '1x1');
+                              setStallDirty(false);
+                              setPendingNextStall(null);
+                            }}
+                            onDragOver={(e) => onDragOverCell(e, m.grid_row, m.grid_col)}
+                            onDrop={(e) => onDropCell(e, m.grid_row, m.grid_col)}
+                            style={cellStyle(m.grid_row, m.grid_col, m.span_cols || 1, m.span_rows || 1)}
+                            className={`z-10 grid cursor-grab place-items-center rounded-lg border p-0.5 text-[9px] font-bold leading-tight active:cursor-grabbing ${meta.className} ${
+                              selectedMarkerId === m.id ? 'z-20 ring-2 ring-brand-600 ring-offset-1' : inBlockedFoot ? 'ring-2 ring-red-500 ring-offset-1' : ''
+                            } ${isBeingDragged ? 'opacity-40' : ''}`}
+                          >
+                            <span className="text-center">{AMENITY_COPY[m.kind]?.icon || '📍'}<br />{m.label}</span>
+                          </button>
+                        );
+                      })}
+
+                      {selectionFootprint.length > 0 && (() => {
+                        const minR = Math.min(...selectionFootprint.map((c) => c.row));
+                        const minC = Math.min(...selectionFootprint.map((c) => c.col));
+                        const maxR = Math.max(...selectionFootprint.map((c) => c.row));
+                        const maxC = Math.max(...selectionFootprint.map((c) => c.col));
+                        const spanCols = maxC - minC + 1;
+                        const spanRows = maxR - minR + 1;
+                        const bad = footprintBlocked;
+                        return (
+                          <>
+                            {selectionFootprint.map((cell) => {
+                              if (cell.kind === 'self') return null;
+                              if (cell.row < 0 || cell.col < 0 || cell.row >= rowsN || cell.col >= maxCols) return null;
+                              const tone = cell.kind === 'blocked' || cell.kind === 'oob'
+                                ? 'border-red-500 bg-red-400/30'
+                                : cell.kind === 'absorb'
+                                  ? 'border-amber-500 bg-amber-300/35'
+                                  : 'border-brand-500 bg-brand-300/30';
+                              return (
+                                <div key={`foot-${cell.key}`} style={cellStyle(cell.row, cell.col)} className={`pointer-events-none z-[15] rounded-lg border-2 border-dashed ${tone}`} />
+                              );
+                            })}
+                            <div style={cellStyle(minR, minC, spanCols, spanRows)} className={`pointer-events-none z-[16] rounded-lg border-2 ${bad ? 'border-red-500' : sizeDirty ? 'border-amber-500' : 'border-brand-600'}`} />
+                          </>
+                        );
+                      })()}
+
+                      {isDragging && dragPreview && hoverCell && (
+                        <div
+                          style={cellStyle(hoverCell.row, hoverCell.col, dragPreview.spanCols, dragPreview.spanRows)}
+                          className="pointer-events-none z-20 grid place-items-center rounded-lg border-2 border-brand-500 bg-brand-100/70 text-brand-700"
+                        >
+                          <Move width={16} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 rounded-lg bg-ink-100 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-ink-500">
+                      {exitLabel}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Floor Plan Grid */}
-              <div className="overflow-x-auto p-6">
-                <div className="mx-auto rounded-2xl bg-gradient-to-b from-slate-50 to-white p-6 shadow-inner" style={{ minWidth: maxCols * (CELL + GAP) + 48 }}>
-                  <div className="mb-3 rounded-full bg-gradient-to-r from-brand-600 to-brand-700 py-2 text-center text-xs font-bold uppercase tracking-widest text-white shadow-md">
-                    {entranceLabel}
-                  </div>
-                  <div
-                    className="relative mx-auto"
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: `repeat(${maxCols}, ${CELL}px)`,
-                      gridTemplateRows: `repeat(${rowsN}, ${CELL}px)`,
-                      gap: GAP,
-                      width: maxCols * CELL + (maxCols - 1) * GAP,
-                    }}
-                  >
-                    {Array.from({ length: rowsN * maxCols }).map((_, idx) => {
-                      const row = Math.floor(idx / maxCols);
-                      const col = idx % maxCols;
-                      const inLayout = col < (layout[row] || 0);
-                      const key = `${row}:${col}`;
-                      const isOcc = occupied.has(key);
-                      const inPreview = previewCells.has(key);
-                      if (!inLayout) return <div key={key} style={cellStyle(row, col)} />;
-                      const isOriginStall = stalls.some((s) => s.grid_row === row && s.grid_col === col);
-                      const isOriginMarker = markers.items.some((m) => m.grid_row === row && m.grid_col === col);
-                      if (isOriginStall || isOriginMarker) return <div key={key} style={cellStyle(row, col)} />;
-                      if (isOcc) {
-                        return <div key={key} style={cellStyle(row, col)} className={`pointer-events-none rounded-lg ${inPreview ? 'bg-brand-200/60 ring-2 ring-brand-400' : ''}`} />;
-                      }
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          style={cellStyle(row, col)}
-                          onClick={() => onCellAction(row, col)}
-                          disabled={saving}
-                          onMouseEnter={() => setHoverCell({ row, col })}
-                          onMouseLeave={() => setHoverCell((h) => (h?.row === row && h?.col === col ? null : h))}
-                          onDragOver={(e) => onDragOverCell(e, row, col)}
-                          onDragLeave={() => setDragOver((d) => (d === key ? null : d))}
-                          onDrop={(e) => onDropCell(e, row, col)}
-                          className={`rounded-lg border-2 border-dashed text-xs font-bold transition-all ${
-                            dragOver === key || inPreview 
-                              ? 'border-brand-500 bg-brand-100 text-brand-700 scale-105 shadow-lg' 
-                              : 'border-slate-300 bg-white text-slate-400 hover:border-brand-400 hover:bg-brand-50'
-                          }`}
-                        >
-                          +
-                        </button>
-                      );
-                    })}
-
-                    {stalls.map((stall) => {
-                      const { span_cols, span_rows } = stallSpans(stall);
-                      const c = stallColors[stall.status];
-                      const isSel = selectedIds.has(stall.id) || selected?.id === stall.id;
-                      const isPending = pendingNextStall?.id === stall.id;
-                      const isBeingDragged = isDragging && (selectedIds.has(stall.id) || selected?.id === stall.id);
-                      const willAbsorb = footprintAbsorbIds.has(stall.id);
-                      return (
-                        <button
-                          key={stall.id}
-                          type="button"
-                          draggable={!stallDirty || selected?.id === stall.id}
-                          onDragStart={(e) => onDragStart(e, { type: 'stall', id: stall.id })}
-                          onDragEnd={onDragEnd}
-                          onClick={(e) => selectStall(stall, e)}
-                          onDragOver={(e) => onDragOverCell(e, stall.grid_row, stall.grid_col)}
-                          onDrop={(e) => onDropCell(e, stall.grid_row, stall.grid_col)}
-                          style={cellStyle(stall.grid_row, stall.grid_col, span_cols, span_rows)}
-                          className={`relative z-10 grid cursor-grab place-items-center rounded-xl border-2 font-bold transition-all active:cursor-grabbing hover:scale-[1.02] ${c.bg} ${c.border} ${c.text} ${
-                            isPending ? 'ring-2 ring-amber-500 ring-offset-2'
-                              : isSel ? 'ring-2 ring-brand-600 ring-offset-2 shadow-lg z-20'
-                              : willAbsorb ? 'ring-2 ring-amber-400 ring-offset-1 opacity-70 z-20'
-                              : 'shadow-md'
-                          } ${isBeingDragged ? 'opacity-30 scale-95' : ''} ${span_cols * span_rows > 1 ? 'text-xs' : 'text-[10px]'}`}
-                        >
-                          {stall.code}
-                          {willAbsorb && (
-                            <span className="absolute inset-x-0 top-0 rounded-t-lg bg-amber-500/90 py-0.5 text-center text-[8px] font-bold uppercase tracking-wide text-white">
-                              Merge
-                            </span>
-                          )}
-                          <span className="absolute bottom-1 right-1 rounded bg-black/10 px-1 text-[8px] font-semibold opacity-70">{span_cols}×{span_rows}</span>
-                        </button>
-                      );
-                    })}
-
-                    {markers.items.map((m) => {
-                      const meta = MARKER_META[m.kind] || MARKER_META.custom;
-                      const isBeingDragged = isDragging && selectedMarkerId === m.id;
-                      const inBlockedFoot = selectionFootprint.some(
-                        (cell) => cell.kind === 'blocked'
-                          && cell.row >= m.grid_row && cell.row < m.grid_row + (m.span_rows || 1)
-                          && cell.col >= m.grid_col && cell.col < m.grid_col + (m.span_cols || 1),
-                      );
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          draggable
-                          onDragStart={(e) => onDragStart(e, { type: 'marker', id: m.id })}
-                          onDragEnd={onDragEnd}
-                          onClick={() => {
-                            setSelectedMarkerId(m.id);
-                            setSelected(null);
-                            setSelectedIds(new Set());
-                            setPlaceTool({ kind: 'marker', marker: m.kind });
-                            setMarkerPaint({ span_cols: m.span_cols || 1, span_rows: m.span_rows || 1 });
-                            const hit = MERGE_SIZES.find((x) => x.span_cols === (m.span_cols || 1) && x.span_rows === (m.span_rows || 1));
-                            setDraftMergeId(hit?.id || '1x1');
-                            setStallDirty(false);
-                            setPendingNextStall(null);
-                            setSizeMenuOpen(false);
-                          }}
-                          onDragOver={(e) => onDragOverCell(e, m.grid_row, m.grid_col)}
-                          onDrop={(e) => onDropCell(e, m.grid_row, m.grid_col)}
-                          style={cellStyle(m.grid_row, m.grid_col, m.span_cols || 1, m.span_rows || 1)}
-                          className={`z-10 grid cursor-grab place-items-center rounded-xl border-2 text-[10px] font-bold transition-all active:cursor-grabbing hover:scale-[1.02] ${meta.className} ${
-                            selectedMarkerId === m.id ? 'ring-2 ring-brand-600 ring-offset-2 shadow-lg z-20'
-                              : inBlockedFoot ? 'ring-2 ring-red-500 ring-offset-1 opacity-80'
-                              : 'shadow-md'
-                          } ${isBeingDragged ? 'opacity-30 scale-95' : ''}`}
-                        >
-                          <span className="text-center leading-tight">
-                            {AMENITY_COPY[m.kind]?.icon || '📍'} {m.label}
-                            <span className="mt-0.5 block text-[8px] opacity-70">{m.span_cols || 1}×{m.span_rows || 1}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-
-                    {/* Selection footprint ghost — shows draft size from selected origin */}
-                    {selectionFootprint.length > 0 && (() => {
-                      const origin = selectionFootprint[0];
-                      if (!origin) return null;
-                      const minR = Math.min(...selectionFootprint.map((c) => c.row));
-                      const minC = Math.min(...selectionFootprint.map((c) => c.col));
-                      const maxR = Math.max(...selectionFootprint.map((c) => c.row));
-                      const maxC = Math.max(...selectionFootprint.map((c) => c.col));
-                      const spanCols = maxC - minC + 1;
-                      const spanRows = maxR - minR + 1;
-                      const bad = footprintBlocked;
-                      return (
-                        <>
-                          {selectionFootprint.map((cell) => {
-                            if (cell.kind === 'self') return null;
-                            if (cell.row < 0 || cell.col < 0 || cell.row >= rowsN || cell.col >= maxCols) return null;
-                            const tone = cell.kind === 'blocked' || cell.kind === 'oob'
-                              ? 'border-red-500 bg-red-400/35'
-                              : cell.kind === 'absorb'
-                                ? 'border-amber-500 bg-amber-300/40'
-                                : 'border-brand-500 bg-brand-300/35';
-                            return (
-                              <div
-                                key={`foot-${cell.key}`}
-                                style={cellStyle(cell.row, cell.col)}
-                                className={`pointer-events-none z-[15] rounded-xl border-2 border-dashed ${tone}`}
-                              />
-                            );
-                          })}
-                          <div
-                            style={cellStyle(minR, minC, spanCols, spanRows)}
-                            className={`pointer-events-none z-[16] rounded-xl border-[3px] ${
-                              bad ? 'border-red-500' : sizeDirty ? 'border-amber-500' : 'border-brand-600'
-                            }`}
-                          >
-                            {sizeDirty && (
-                              <div className={`absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow ${
-                                bad ? 'bg-red-600' : 'bg-amber-500'
-                              }`}>
-                                {bad ? 'Blocked' : `Preview ${draftMerge.label} — Apply to save`}
-                              </div>
-                            )}
-                          </div>
-                        </>
-                      );
-                    })()}
-
-                    {/* Ghost Preview for Drag Position */}
-                    {isDragging && dragPreview && hoverCell && (
-                      <div
-                        style={cellStyle(dragPreview.row, dragPreview.col, dragPreview.spanCols, dragPreview.spanRows)}
-                        className="pointer-events-none absolute z-20 grid place-items-center rounded-xl border-2 border-brand-500 bg-brand-100/80 text-brand-700 shadow-xl"
-                      >
-                        <div className="flex flex-col items-center">
-                          <Move width={20} />
-                          <span className="mt-1 text-xs font-bold">Drop here</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-3 rounded-full bg-slate-200 py-2 text-center text-xs font-bold uppercase tracking-widest text-slate-600">
-                    {exitLabel}
-                  </div>
-                </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink-100 px-4 py-2">
+                {(Object.keys(stallColors) as (keyof typeof stallColors)[]).map((k) => (
+                  <span key={k} className="inline-flex items-center gap-1.5 text-[10px] font-medium text-ink-500">
+                    <span className={`h-2.5 w-2.5 rounded-sm ${stallColors[k].legend}`} /> {stallColors[k].label}
+                  </span>
+                ))}
+                {sizeDirty && (selected || selectedMarkerId) && (
+                  <span className="ml-auto text-[10px] font-semibold text-amber-700">Preview active — Apply to save size</span>
+                )}
               </div>
             </div>
 
-            {/* Modern Sidebar Panel */}
-            <aside className="card flex max-h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg xl:sticky xl:top-24">
-              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
-                {/* Drag Instructions Panel */}
+            {/* Inspector */}
+            <aside className="card flex w-full shrink-0 flex-col overflow-hidden p-0 xl:w-[340px] xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)]">
+              <div className="border-b border-ink-100 px-4 py-3">
+                <div className="text-[11px] font-bold uppercase tracking-wide text-ink-400">
+                  {inspectorMode === 'place' ? 'Place mode' : inspectorMode === 'multi' ? 'Multi-select' : 'Edit selection'}
+                </div>
+                <div className="font-display text-base font-extrabold text-ink-900">
+                  {inspectorMode === 'place' && 'Click + on the grid'}
+                  {inspectorMode === 'stall' && selected?.code}
+                  {inspectorMode === 'amenity' && (markers.items.find((x) => x.id === selectedMarkerId)?.label || 'Amenity')}
+                  {inspectorMode === 'multi' && `${selectedIds.size} stalls`}
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
                 {isDragging && (
-                  <div className="rounded-2xl border-2 border-brand-200 bg-gradient-to-br from-brand-50 to-brand-100 p-5 shadow-md">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-white">
-                        <Move width={20} />
-                      </div>
-                      <div className="font-display text-base font-bold text-slate-900">Dragging Mode</div>
-                    </div>
-                    <div className="space-y-2 text-sm text-slate-700">
-                      <div className="flex items-center gap-2">
-                        <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">Drag</span>
-                        <span>Move item to new position</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">↑ ↓ ← →</span>
-                        <span>Fine-tune with arrow keys</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="rounded bg-white px-2 py-1 text-xs font-semibold text-slate-600">Esc</span>
-                        <span>Cancel drag operation</span>
-                      </div>
-                    </div>
-                    {dragPreview && hoverCell && (
-                      <div className="mt-3 rounded-lg bg-white p-3 text-xs">
-                        <div className="font-semibold text-slate-700">Target Position</div>
-                        <div className="mt-1 text-slate-600">Row: {hoverCell.row + 1}, Col: {hoverCell.col + 1}</div>
-                        <div className="text-slate-600">Size: {dragPreview.spanCols}×{dragPreview.spanRows}</div>
-                      </div>
-                    )}
+                  <div className="rounded-xl border border-brand-200 bg-brand-soft/50 p-3 text-xs text-ink-700">
+                    <div className="mb-1 flex items-center gap-2 font-bold text-ink-900"><Move width={14} /> Dragging</div>
+                    Drop on a cell · arrow keys to nudge · Esc to cancel
                   </div>
                 )}
 
                 {pendingNextStall && selected && (
-                  <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
-                    <div className="text-sm font-bold text-amber-900">Unsaved changes on {selected.code}</div>
+                  <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+                    <div className="text-sm font-bold text-amber-900">Unsaved on {selected.code}</div>
                     <p className="mt-1 text-xs text-amber-800">Switch to {pendingNextStall.code}?</p>
-                    <div className="mt-3 flex flex-col gap-2">
-                      <button type="button" onClick={saveAndSwitch} disabled={saving} className="btn-primary w-full text-sm font-semibold">Save & Switch</button>
-                      <button type="button" onClick={discardAndSwitch} className="rounded-xl border border-amber-400 bg-white py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-50">Discard</button>
-                    <button type="button" onClick={cancelPendingSwitch} className="btn-outline w-full text-sm">Cancel</button>
-                  </div>
-                </div>
-              )}
-
-              {/* Tool Type — place mode only */}
-              {!selected && !selectedMarkerId && (
-              <div>
-                <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Place on empty cell</div>
-                <div className="grid grid-cols-2 gap-2">
-                  {PLACE_OPTIONS.map((o) => (
-                    <button
-                      key={o.value}
-                      type="button"
-                      onClick={() => { void onTypeDropdownChange(o.value); }}
-                      disabled={saving}
-                      className={`flex items-center gap-2 rounded-xl border-2 px-3 py-3 text-sm font-semibold transition-all ${
-                        currentTypeValue === o.value
-                          ? 'border-brand-500 bg-brand-50 text-brand-700 shadow-md'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <span className="text-lg">{o.icon}</span>
-                      {o.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              )}
-
-              {/* Selected: clear edit header */}
-              {(selected || selectedMarkerId) && selectedIds.size <= 1 && (
-                <div className="rounded-2xl border-2 border-brand-200 bg-brand-50/80 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wide text-brand-600">Selected</div>
-                      <div className="font-display text-base font-extrabold text-slate-900">
-                        {selected ? selected.code : (markers.items.find((x) => x.id === selectedMarkerId)?.label || 'Amenity')}
-                      </div>
-                      <p className="mt-0.5 text-[11px] text-slate-600">
-                        Change size below — neighbours highlighted on the plan. Click Apply to save.
-                      </p>
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      <button type="button" onClick={saveAndSwitch} disabled={saving} className="btn-primary w-full text-sm">Save & switch</button>
+                      <button type="button" onClick={discardAndSwitch} className="btn-outline w-full text-sm">Discard</button>
+                      <button type="button" onClick={cancelPendingSwitch} className="btn-ghost w-full text-sm">Cancel</button>
                     </div>
-                    <button type="button" onClick={clearSelection} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700">
-                      <X width={18} />
-                    </button>
-                  </div>
-                  {selected && (
-                    <div className="mt-2">
-                      <div className="mb-1 text-[10px] font-bold uppercase text-slate-500">Convert type</div>
-                      <select
-                        className="input border-slate-200 bg-white py-2 text-sm font-semibold shadow-sm"
-                        value={currentTypeValue}
-                        disabled={saving}
-                        onChange={(e) => { void onTypeDropdownChange(e.target.value); }}
-                      >
-                        {PLACE_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>{o.icon} {o.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {selectedMarkerId && (
-                    <div className="mt-2">
-                      <div className="mb-1 text-[10px] font-bold uppercase text-slate-500">Amenity type</div>
-                      <select
-                        className="input border-slate-200 bg-white py-2 text-sm font-semibold shadow-sm"
-                        value={currentTypeValue}
-                        disabled={saving}
-                        onChange={(e) => { void onTypeDropdownChange(e.target.value); }}
-                      >
-                        {PLACE_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>{o.icon} {o.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Size Selector */}
-              <div>
-                <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                  {selected || selectedMarkerId ? 'Size · merge cells' : 'Size for next place'}
-                </div>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setSizeMenuOpen((o) => !o)}
-                    className={`flex w-full items-center gap-3 rounded-xl border-2 bg-white px-4 py-3 text-left transition-all ${sizeDirty ? 'border-amber-400 ring-2 ring-amber-100' : 'border-slate-200'}`}
-                  >
-                    <MergeIcon cols={draftMerge.span_cols} rows={draftMerge.span_rows} active />
-                    <span className="flex-1">
-                      <span className="block font-display text-sm font-extrabold text-slate-900">{draftMerge.label}</span>
-                      <span className="block text-xs font-medium text-slate-400">
-                        {draftMerge.hint}
-                        {sizeDirty ? ' · preview on plan' : ''}
-                        {footprintBlocked ? ' · blocked' : ''}
-                      </span>
-                    </span>
-                    <ChevronDown width={16} className={`text-slate-400 transition-transform ${sizeMenuOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {sizeMenuOpen && (
-                    <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-                      {MERGE_SIZES.map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => {
-                            setDraftMergeId(m.id);
-                            setSizeMenuOpen(false);
-                          }}
-                          className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-all hover:bg-brand-50 ${draftMergeId === m.id ? 'bg-brand-50' : ''}`}
-                        >
-                          <MergeIcon cols={m.span_cols} rows={m.span_rows} active={draftMergeId === m.id} />
-                          <span>
-                            <span className="block text-sm font-bold text-slate-900">{m.label}</span>
-                            <span className="block text-xs text-slate-400">{m.hint}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {(selected || selectedMarkerId) && sizeDirty && (
-                  <div className={`mt-2 rounded-xl px-3 py-2 text-[11px] font-medium ${
-                    footprintBlocked ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-900'
-                  }`}>
-                    {footprintBlocked
-                      ? 'Red cells are blocked (booked / amenity / off-plan). Pick a smaller size or free those cells.'
-                      : footprintAbsorbIds.size > 0
-                        ? `Amber stalls (${footprintAbsorbIds.size}) will be merged into this booth when you Apply.`
-                        : `Blue outline shows the new ${draftMerge.label} footprint. Click Apply to save.`}
                   </div>
                 )}
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { void applyMerge(); }}
-                    disabled={saving || footprintBlocked || (!sizeDirty && !!(selected || selectedMarkerId))}
-                    className={`btn-primary flex-1 bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-2.5 text-sm font-semibold shadow-lg shadow-brand-500/20 ${sizeDirty && !footprintBlocked ? '' : 'opacity-50'}`}
-                  >
-                    {saving ? 'Applying…' : sizeDirty ? `Apply ${draftMerge.label}` : 'Apply Size'}
-                  </button>
-                  {sizeDirty && (selected || selectedMarkerId) && (
-                    <button
-                      type="button"
-                      onClick={() => { setDraftMergeId(savedMerge.id); setSizeMenuOpen(false); }}
-                      className="btn-outline border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm"
-                    >
-                      Discard
-                    </button>
-                  )}
-                </div>
-              </div>
 
-              {/* Stall Details Panel */}
-              {selected && !selectedMarkerId && selectedIds.size <= 1 && (
-                <div className="space-y-4 border-t border-slate-100 pt-5">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-display text-lg font-extrabold text-slate-900">Stall details</h3>
-                  </div>
-                  
-                  {/* Dimensions */}
-                  <div className="grid grid-cols-3 gap-3 rounded-2xl bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
+                {inspectorMode === 'place' && (
+                  <>
                     <div>
-                      <div className="text-[10px] font-bold uppercase text-slate-400">Width</div>
-                      <div className="font-display text-lg font-bold text-slate-900">{(stallSpans(selected).span_cols * 3)} m</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-bold uppercase text-slate-400">Depth</div>
-                      <div className="font-display text-lg font-bold text-slate-900">{(stallSpans(selected).span_rows * 3)} m</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-bold uppercase text-slate-400">Area</div>
-                      <div className="font-display text-lg font-bold text-brand-700">
-                        {(stallSpans(selected).span_cols * stallSpans(selected).span_rows * 9)} m²
+                      <PanelHead title="What to place" hint="Pick a type, then click an empty cell (+)" />
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {PLACE_OPTIONS.map((o) => (
+                          <button
+                            key={o.value}
+                            type="button"
+                            onClick={() => { void onTypeDropdownChange(o.value); }}
+                            disabled={saving}
+                            className={`flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2 text-[10px] font-semibold transition-colors ${
+                              currentTypeValue === o.value ? 'border-brand-500 bg-brand-soft text-brand-700' : 'border-ink-100 bg-white text-ink-600 hover:border-ink-200'
+                            }`}
+                          >
+                            <span className="text-base leading-none">{o.icon}</span>
+                            {o.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => quickPlaceEnter('front-center')} disabled={saving} className="btn-outline flex-1 py-2 text-xs">🚪 Entrance</button>
+                      <button type="button" onClick={() => { setMarkerPaint({ span_cols: 2, span_rows: 2 }); setPlaceTool({ kind: 'marker', marker: 'stage' }); void quickPlaceStage(); }} disabled={saving} className="btn-outline flex-1 py-2 text-xs">🎭 Stage 2×2</button>
+                    </div>
+                  </>
+                )}
 
-                  {/* Form Fields */}
-                  <div className="space-y-3">
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Stall Code</span>
-                      <input className="input border-slate-200 bg-white shadow-sm" value={stallForm.code} onChange={(e) => patchStallForm({ code: e.target.value })} />
+                {(inspectorMode === 'stall' || inspectorMode === 'amenity') && (
+                  <div className="flex items-center justify-between gap-2">
+                    <select
+                      className="input py-2 text-sm font-semibold"
+                      value={currentTypeValue}
+                      disabled={saving}
+                      onChange={(e) => { void onTypeDropdownChange(e.target.value); }}
+                    >
+                      {PLACE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={clearSelection} className="shrink-0 rounded-lg border border-ink-200 p-2 text-ink-400 hover:bg-ink-50"><X width={16} /></button>
+                  </div>
+                )}
+
+                <div>
+                  <PanelHead
+                    title="Cell size"
+                    hint={inspectorMode === 'place' ? 'Size for the next placement' : 'Tap a size — preview on grid — then Apply'}
+                  />
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {MERGE_SIZES.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setDraftMergeId(m.id)}
+                        className={`flex flex-col items-center gap-1 rounded-xl border px-2 py-2 transition-colors ${
+                          draftMergeId === m.id ? 'border-brand-500 bg-brand-soft' : 'border-ink-100 bg-white hover:border-ink-200'
+                        }`}
+                      >
+                        <MergeIcon cols={m.span_cols} rows={m.span_rows} active={draftMergeId === m.id} />
+                        <span className="text-xs font-bold text-ink-900">{m.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {(inspectorMode === 'stall' || inspectorMode === 'amenity') && sizeDirty && (
+                    <p className={`mt-2 rounded-lg px-2.5 py-2 text-[11px] leading-snug ${footprintBlocked ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-900'}`}>
+                      {footprintBlocked
+                        ? 'Blocked cells in red — choose a smaller size or free the space.'
+                        : footprintAbsorbIds.size > 0
+                          ? `${footprintAbsorbIds.size} neighbour(s) will merge in on Apply.`
+                          : `Outline shows ${draftMerge.label} — Apply to save.`}
+                    </p>
+                  )}
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { void applyMerge(); }}
+                      disabled={saving || footprintBlocked || (!sizeDirty && (inspectorMode === 'stall' || inspectorMode === 'amenity'))}
+                      className={`btn-primary flex-1 text-sm ${sizeDirty && !footprintBlocked ? '' : 'opacity-50'}`}
+                    >
+                      {saving ? 'Applying…' : sizeDirty ? `Apply ${draftMerge.label}` : inspectorMode === 'place' ? 'Set size' : 'Apply size'}
+                    </button>
+                    {sizeDirty && (inspectorMode === 'stall' || inspectorMode === 'amenity') && (
+                      <button type="button" onClick={() => setDraftMergeId(savedMerge.id)} className="btn-outline text-sm">Reset</button>
+                    )}
+                  </div>
+                </div>
+
+                {inspectorMode === 'stall' && selected && (
+                  <div className="space-y-3 border-t border-ink-100 pt-4">
+                    <div className="grid grid-cols-3 gap-2 rounded-xl bg-ink-50 p-3 text-center">
+                      <div><div className="text-[10px] font-bold text-ink-400">W</div><div className="text-sm font-bold">{stallSpans(selected).span_cols * 3}m</div></div>
+                      <div><div className="text-[10px] font-bold text-ink-400">D</div><div className="text-sm font-bold">{stallSpans(selected).span_rows * 3}m</div></div>
+                      <div><div className="text-[10px] font-bold text-ink-400">Area</div><div className="text-sm font-bold text-brand-700">{stallSpans(selected).span_cols * stallSpans(selected).span_rows * 9}m²</div></div>
+                    </div>
+                    <label className="block text-xs">
+                      <span className="mb-1 block font-semibold text-ink-500">Code</span>
+                      <input className="input py-2 text-sm" value={stallForm.code} onChange={(e) => patchStallForm({ code: e.target.value })} />
                     </label>
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Price (₹)</span>
-                      <input className="input border-slate-200 bg-white shadow-sm" type="number" min={0} value={stallForm.price} onChange={(e) => patchStallForm({ price: e.target.value })} />
-                      <span className="mt-1 block text-xs text-slate-400">{formatINR(Number(stallForm.price) || 0)}</span>
+                    <label className="block text-xs">
+                      <span className="mb-1 block font-semibold text-ink-500">Price (₹)</span>
+                      <input className="input py-2 text-sm" type="number" min={0} value={stallForm.price} onChange={(e) => patchStallForm({ price: e.target.value })} />
+                      <span className="mt-0.5 block text-[11px] text-ink-400">{formatINR(Number(stallForm.price) || 0)}</span>
                     </label>
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Zone</span>
-                      <select className="input border-slate-200 bg-white shadow-sm" value={stallForm.zone} onChange={(e) => patchStallForm({ zone: e.target.value })}>
+                    <label className="block text-xs">
+                      <span className="mb-1 block font-semibold text-ink-500">Zone</span>
+                      <select className="input py-2 text-sm" value={stallForm.zone} onChange={(e) => patchStallForm({ zone: e.target.value })}>
                         <option>Standard</option><option>Premium</option><option>Sponsor</option>
                       </select>
                     </label>
-                  </div>
-
-                  {/* Status Selector */}
-                  <div>
-                    <div className="mb-2 text-xs font-bold uppercase text-slate-500">Status</div>
-                    <div className="space-y-2">
-                      {(Object.keys(stallColors) as (keyof typeof stallColors)[]).map((k) => (
-                        <button key={k} type="button" onClick={() => patchStallForm({ status: k })}
-                          className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-all ${stallForm.status === k ? 'border-brand-500 bg-brand-50 text-brand-700 shadow-md' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>
-                          <span className={`h-4 w-4 rounded ${stallColors[k].legend}`} /> {stallColors[k].label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Description</span>
-                    <textarea className="input min-h-[80px] border-slate-200 bg-white shadow-sm" value={stallForm.description} onChange={(e) => patchStallForm({ description: e.target.value })} />
-                  </label>
-
-                  <button onClick={deleteSelectedStalls} disabled={saving} className="w-full rounded-xl border-2 border-red-200 bg-red-50 py-3 text-sm font-semibold text-red-700 hover:bg-red-100 transition-all">
-                    <Trash2 width={14} className="mr-2" /> Delete Stall
-                  </button>
-                </div>
-              )}
-
-              {/* Amenity Details Panel */}
-              {selectedMarkerId && (() => {
-                const m = markers.items.find((x) => x.id === selectedMarkerId);
-                if (!m) return null;
-                const copy = AMENITY_COPY[m.kind] || AMENITY_COPY.custom;
-                const meta = MARKER_META[m.kind] || MARKER_META.custom;
-                return (
-                  <div className="space-y-4 border-t border-slate-100 pt-5">
-                    <div className={`rounded-2xl border-2 p-5 shadow-md ${meta.className}`}>
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl">{copy.icon}</span>
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-widest opacity-70">Amenity</div>
-                          <div className="font-display text-xl font-extrabold">{copy.title}</div>
-                        </div>
+                    <div>
+                      <span className="mb-1.5 block text-xs font-semibold text-ink-500">Status</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {(Object.keys(stallColors) as (keyof typeof stallColors)[]).map((k) => (
+                          <button key={k} type="button" onClick={() => patchStallForm({ status: k })}
+                            className={`flex items-center gap-2 rounded-lg border px-2 py-2 text-xs font-semibold ${
+                              stallForm.status === k ? 'border-brand-500 bg-brand-soft text-brand-700' : 'border-ink-100 bg-white text-ink-600'
+                            }`}>
+                            <span className={`h-2.5 w-2.5 rounded-sm ${stallColors[k].legend}`} /> {stallColors[k].label}
+                          </button>
+                        ))}
                       </div>
-                      <p className="mt-2 text-sm opacity-90">{copy.tip}</p>
                     </div>
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Label on Map</span>
-                      <input 
-                        className="input border-slate-200 bg-white shadow-sm" 
-                        defaultValue={m.label} 
-                        key={m.id} 
-                        onBlur={(e) => {
+                    <label className="block text-xs">
+                      <span className="mb-1 block font-semibold text-ink-500">Description</span>
+                      <textarea className="input min-h-[72px] py-2 text-sm" value={stallForm.description} onChange={(e) => patchStallForm({ description: e.target.value })} />
+                    </label>
+                    <button onClick={deleteSelectedStalls} disabled={saving} className="w-full rounded-xl border border-red-200 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50">
+                      <Trash2 width={14} className="inline" /> Delete stall
+                    </button>
+                  </div>
+                )}
+
+                {inspectorMode === 'amenity' && selectedMarkerId && (() => {
+                  const m = markers.items.find((x) => x.id === selectedMarkerId);
+                  if (!m) return null;
+                  const copy = AMENITY_COPY[m.kind] || AMENITY_COPY.custom;
+                  return (
+                    <div className="space-y-3 border-t border-ink-100 pt-4">
+                      <div className="rounded-xl border border-ink-100 bg-ink-50 p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{copy.icon}</span>
+                          <div>
+                            <div className="text-[10px] font-bold uppercase text-ink-400">Amenity</div>
+                            <div className="font-display font-bold text-ink-900">{copy.title}</div>
+                          </div>
+                        </div>
+                        <p className="mt-1 text-xs text-ink-500">{copy.tip}</p>
+                      </div>
+                      <label className="block text-xs">
+                        <span className="mb-1 block font-semibold text-ink-500">Map label</span>
+                        <input className="input py-2 text-sm" defaultValue={m.label} key={m.id} onBlur={(e) => {
                           const v = e.target.value.trim();
                           if (v && v !== m.label) updateSelectedMarker({ label: v });
-                        }} 
-                      />
-                    </label>
-                    <button onClick={deleteSelectedMarker} disabled={saving} className="w-full rounded-xl border-2 border-red-200 bg-red-50 py-3 text-sm font-semibold text-red-700 hover:bg-red-100 transition-all">
-                      <Trash2 width={14} className="mr-2" /> Remove from Plan
-                    </button>
-                  </div>
-                );
-              })()}
-
-              {/* Placement Instructions */}
-              {!selected && !selectedMarkerId && selectedIds.size <= 1 && (
-                <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-gradient-to-br from-slate-50 to-white p-5 text-center shadow-sm">
-                  <div className="text-2xl mb-2">{PLACE_OPTIONS.find((o) => o.value === currentTypeValue)?.icon || '🏪'}</div>
-                  <div className="font-display text-sm font-bold text-slate-900">
-                    Place {PLACE_OPTIONS.find((o) => o.value === currentTypeValue)?.label} · {currentMerge.label}
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">Click an empty cell (+) on the plan to place</p>
-                  {placeTool.kind === 'marker' && (
-                    <button
-                      type="button"
-                      draggable
-                      onDragStart={(e) => onDragStart(e, { type: 'new-marker', kind: placeTool.marker })}
-                      className={`mt-4 w-full cursor-grab rounded-xl border-2 px-4 py-3 text-sm font-bold active:cursor-grabbing transition-all ${MARKER_META[placeTool.marker].className}`}
-                    >
-                      Or drag onto plan
-                    </button>
-                  )}
-                  <div className="mt-4 flex flex-col gap-2">
-                    <button type="button" onClick={() => quickPlaceEnter('front-center')} disabled={saving}
-                      className="rounded-xl border-2 border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-all">
-                      🚪 Quick Entrance
-                    </button>
-                    <button type="button" onClick={() => { setMarkerPaint({ span_cols: 2, span_rows: 2 }); setPlaceTool({ kind: 'marker', marker: 'stage' }); void quickPlaceStage(); }} disabled={saving}
-                      className="rounded-xl border-2 border-violet-200 bg-violet-50 px-4 py-2.5 text-xs font-bold text-violet-800 hover:bg-violet-100 transition-all">
-                      🎭 Quick Stage 2×2
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Multi-Selection Panel */}
-              {selectedIds.size > 1 && (
-                <div className="rounded-2xl border-2 border-brand-200 bg-gradient-to-br from-brand-50 to-white p-4 shadow-md">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">
-                      {selectedIds.size}
+                        }} />
+                      </label>
+                      <button onClick={deleteSelectedMarker} disabled={saving} className="w-full rounded-xl border border-red-200 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50">
+                        Remove amenity
+                      </button>
                     </div>
-                    <div className="font-display text-sm font-bold text-slate-900">Stalls Selected</div>
+                  );
+                })()}
+
+                {inspectorMode === 'multi' && (
+                  <div className="space-y-3 border-t border-ink-100 pt-4">
+                    <p className="text-xs text-ink-500">Shift+click or ⌘+click to add stalls. Drag as a group.</p>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={clearSelection} className="btn-outline flex-1 text-sm">Clear</button>
+                      <button type="button" onClick={deleteSelectedStalls} className="flex-1 rounded-xl border border-red-200 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Delete all</button>
+                    </div>
                   </div>
-                  <div className="mt-3 flex gap-2">
-                    <button type="button" onClick={clearSelection} className="btn-outline flex-1 border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm">Clear</button>
-                    <button type="button" onClick={deleteSelectedStalls} className="flex-1 rounded-xl border-2 border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 transition-all">
-                      <Trash2 width={14} className="mr-1" /> Delete
+                )}
+              </div>
+
+              {inspectorMode === 'stall' && selected && (
+                <div className={`shrink-0 border-t px-4 py-3 ${stallDirty ? 'border-amber-200 bg-amber-50' : 'border-ink-100 bg-ink-50/50'}`}>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={discardStallEdits} disabled={!stallDirty || saving} className="btn-outline flex-1 text-sm disabled:opacity-40">Discard</button>
+                    <button type="button" onClick={() => { void saveStall(); }} disabled={!stallDirty || saving} className="btn-primary flex-[1.4] text-sm disabled:opacity-50">
+                      {saving ? 'Saving…' : 'Save details'}
                     </button>
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Save Actions Footer */}
-            {selected && !selectedMarkerId && selectedIds.size <= 1 && (
-              <div className={`shrink-0 border-t px-5 py-4 ${stallDirty ? 'border-amber-300 bg-amber-50' : 'border-slate-100 bg-white'}`}>
-                <div className={`mb-3 text-center text-xs font-bold ${stallDirty ? 'text-amber-800' : 'text-slate-400'}`}>
-                  {stallDirty ? '● Unsaved changes' : `Editing ${selected.code}`}
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={discardStallEdits} disabled={!stallDirty || saving} className="btn-outline flex-1 border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold shadow-sm disabled:opacity-40">Discard</button>
-                  <button type="button" onClick={() => { void saveStall(); }} disabled={!stallDirty || saving}
-                    className={`flex-[1.5] rounded-full px-6 py-2.5 text-sm font-bold text-white disabled:opacity-50 shadow-lg ${stallDirty ? 'bg-gradient-to-r from-brand-600 to-brand-700' : 'bg-slate-300'}`}>
-                    {saving ? 'Saving…' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </aside>
-        </div>
-      )}
+            </aside>
+          </div>
+        )}
       </main>
     </div>
   );

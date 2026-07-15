@@ -89,7 +89,7 @@ export default function Home() {
         {/* Soft pink hero background */}
         <div className="absolute inset-0 -z-20" style={{ background: 'linear-gradient(180deg,#fdf2f8 0%, #f5f3ff 55%, #ffffff 100%)' }} />
 
-        <div className="container-px relative z-10 grid items-center gap-10 pb-16 pt-10 lg:grid-cols-2 lg:gap-8 lg:pb-24 lg:pt-14">
+        <div className="container-px relative z-10 grid items-center gap-10 pb-8 pt-10 lg:grid-cols-2 lg:gap-8 lg:pb-10 lg:pt-12">
           {/* Left — city-aware copy + inline search */}
           <div className="max-w-xl">
             <h1 className="font-display text-[2.45rem] font-extrabold leading-[1.1] text-ink-900 sm:text-5xl lg:text-[3.2rem]">
@@ -136,6 +136,7 @@ export default function Home() {
         subtitle={canBook ? 'Book your stall at expos running right now.' : 'Walk in, explore halls and meet exhibitors today.'}
         items={liveInCity}
         count={cityStats.live}
+        className="mt-8"
       />
       <CityStatusSection
         city={city}
@@ -284,7 +285,7 @@ function HeroVisual({
   const current = HERO_SLIDES[slide];
 
   return (
-    <div className="relative mx-auto w-full max-w-[560px] pb-14 lg:max-w-none lg:justify-self-end lg:pb-10">
+    <div className="relative mx-auto w-full max-w-[560px] lg:max-w-none lg:justify-self-end">
       {/* Soft concentric rings */}
       <div className="pointer-events-none absolute left-1/2 top-[46%] z-0 h-[118%] w-[118%] -translate-x-1/2 -translate-y-1/2">
         <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, rgba(252,232,239,0.95) 0%, rgba(243,232,255,0.35) 45%, transparent 70%)' }} />
@@ -382,6 +383,7 @@ function CityStatusSection({
   subtitle,
   items,
   count,
+  className = 'mt-16',
 }: {
   city: string;
   status: 'live' | 'upcoming' | 'past';
@@ -389,9 +391,10 @@ function CityStatusSection({
   subtitle: string;
   items: Exhibition[];
   count: number;
+  className?: string;
 }) {
   return (
-    <section className="container-px mt-16">
+    <section className={`container-px ${className}`}>
       <SectionHeading title={title} subtitle={subtitle} />
       {items.length > 0 ? (
         <>

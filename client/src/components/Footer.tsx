@@ -26,7 +26,7 @@ const COLS = [
   {
     title: 'Company',
     items: [
-      { label: 'About Us', to: '#' },
+      { label: 'Product deck (PDF)', to: '/product' },
       { label: 'Careers', to: '#' },
       { label: 'Media Kit', to: '#' },
       { label: 'Contact Us', to: '#' },
