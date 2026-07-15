@@ -17,7 +17,7 @@ export function normalizeRowLayout(input, fallbackRows = 6, fallbackCols = 8) {
   return { layout, grid_rows, grid_cols };
 }
 
-export const MARKER_KINDS = ['enter', 'exit', 'lounge', 'food', 'restroom', 'info', 'stage', 'clinic', 'custom'];
+export const MARKER_KINDS = ['enter', 'exit', 'lounge', 'food', 'restroom', 'info', 'stage', 'clinic', 'fire', 'custom'];
 
 export function defaultHallMarkers() {
   return {

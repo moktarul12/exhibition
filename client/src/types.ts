@@ -69,7 +69,7 @@ export interface Hall {
   markers?: FloorMarkers;
 }
 
-export type FloorMarkerKind = 'enter' | 'exit' | 'lounge' | 'food' | 'restroom' | 'info' | 'stage' | 'clinic' | 'custom';
+export type FloorMarkerKind = 'enter' | 'exit' | 'lounge' | 'food' | 'restroom' | 'info' | 'stage' | 'clinic' | 'fire' | 'custom';
 
 export interface FloorMarker {
   id: string;

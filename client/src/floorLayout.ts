@@ -75,6 +75,7 @@ export const MARKER_META: Record<string, { label: string; className: string }> =
   info: { label: 'Info', className: 'bg-indigo-100 text-indigo-900 border-indigo-300' },
   stage: { label: 'Stage', className: 'bg-violet-100 text-violet-900 border-violet-300' },
   clinic: { label: 'Clinic', className: 'bg-teal-100 text-teal-900 border-teal-300' },
+  fire: { label: 'Fire Exit', className: 'bg-red-500 text-white border-red-600' },
   custom: { label: 'Zone', className: 'bg-ink-100 text-ink-700 border-ink-300' },
 };
 

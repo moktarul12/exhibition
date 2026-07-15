@@ -121,6 +121,7 @@ async function occupancyBlocks(hallId, excludeStallId = null) {
       col: s.grid_col,
       span_rows: Number(s.span_rows) || 1,
       span_cols: Number(s.span_cols) || 1,
+      status: s.status,
     });
   }
   for (const m of h.markers?.items || []) {
@@ -971,17 +972,41 @@ app.patch('/api/admin/stalls/:id', authRequired, requireRole('admin'), async (re
       return res.status(400).json({ error: 'Stall does not fit in the layout at that position/size' });
     }
     if (collides(blocks, { row: grid_row, col: grid_col, span_rows, span_cols })) {
-      // Swap with a single 1×1 stall occupying the target origin (simple drag-swap)
-      const target = blocks.find((x) => x.kind === 'stall' && x.row === grid_row && x.col === grid_col
-        && (Number(x.span_cols) || 1) === 1 && (Number(x.span_rows) || 1) === 1
-        && span_cols === 1 && span_rows === 1);
-      if (target && (b.grid_row != null || b.grid_col != null)) {
-        await db.execute({
-          sql: 'UPDATE stalls SET grid_row=?, grid_col=? WHERE id=?',
-          args: [s.grid_row, s.grid_col, target.id],
-        });
+      const expanding = (b.display_size != null || b.span_cols != null || b.span_rows != null)
+        && b.grid_row == null && b.grid_col == null;
+      const overlapping = blocks.filter((x) => rectsOverlap(
+        { row: x.row, col: x.col, span_rows: x.span_rows, span_cols: x.span_cols },
+        { row: grid_row, col: grid_col, span_rows, span_cols },
+      ));
+      // Expanding size: absorb neighbouring available/blocked stalls into this footprint
+      const absorbable = (x) => x.kind === 'stall' && (x.status === 'available' || x.status === 'blocked');
+      const canAbsorb = expanding
+        && overlapping.length > 0
+        && overlapping.every(absorbable);
+      if (canAbsorb) {
+        for (const x of overlapping) {
+          await db.execute({ sql: 'DELETE FROM bookings WHERE stall_id=?', args: [x.id] });
+          await db.execute({ sql: 'DELETE FROM stalls WHERE id=?', args: [x.id] });
+        }
       } else {
-        return res.status(409).json({ error: 'Target space is occupied' });
+        // Swap with a single 1×1 stall occupying the target origin (simple drag-swap)
+        const target = blocks.find((x) => x.kind === 'stall' && x.row === grid_row && x.col === grid_col
+          && (Number(x.span_cols) || 1) === 1 && (Number(x.span_rows) || 1) === 1
+          && span_cols === 1 && span_rows === 1);
+        if (target && (b.grid_row != null || b.grid_col != null)) {
+          await db.execute({
+            sql: 'UPDATE stalls SET grid_row=?, grid_col=? WHERE id=?',
+            args: [s.grid_row, s.grid_col, target.id],
+          });
+        } else {
+          const blocker = overlapping.find((x) => !absorbable(x));
+          const why = blocker?.kind === 'marker'
+            ? 'An amenity is in the way'
+            : blocker?.status
+              ? `Neighbour stall is ${blocker.status}`
+              : 'Target space is occupied';
+          return res.status(409).json({ error: why });
+        }
       }
     }
 
