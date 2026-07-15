@@ -43,8 +43,17 @@ export default function ExhibitionCard({ e }: { e: Exhibition }) {
 
         <div className="mt-auto flex items-center justify-between pt-4">
           <div>
-            <div className="text-[11px] text-ink-400">From</div>
-            <div className="font-display text-lg font-extrabold text-ink-900">{formatINR(e.price_from)}</div>
+            {user?.role === 'admin' ? (
+              <>
+                <div className="text-[11px] text-ink-400">From</div>
+                <div className="font-display text-lg font-extrabold text-ink-900">{formatINR(e.price_from)}</div>
+              </>
+            ) : (
+              <>
+                <div className="text-[11px] text-ink-400">Available</div>
+                <div className="font-display text-lg font-extrabold text-emerald-600">{e.available_stalls ?? 0} <span className="text-sm font-medium text-ink-400">stalls</span></div>
+              </>
+            )}
           </div>
           <span className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 transition-transform group-hover:translate-x-0.5">
             {e.status === 'past' ? 'View report' : canBook ? 'Book stall' : 'View details'} <ArrowRight width={16} />

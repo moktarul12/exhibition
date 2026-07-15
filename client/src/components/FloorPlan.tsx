@@ -11,6 +11,7 @@ import { hallRowLayout, hallMarkers, stallSpans, MARKER_META } from '../floorLay
 export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; exhibitionName: string }) {
   const { user } = useAuth();
   const canBook = user?.role === 'exhibitor' || user?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
   const navigate = useNavigate();
   const [hallId, setHallId] = useState<number | null>(halls[0]?.id ?? null);
   const [stalls, setStalls] = useState<Stall[]>([]);
@@ -249,7 +250,7 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
               <Info label="Type" value={selected.type} />
               <Info label="Zone" value={selected.zone} />
               <Info label="Status" value={<span className={stallColors[selected.status].text + ' font-semibold'}>{stallColors[selected.status].label}</span>} />
-              {canBook && <Info label="Price" value={<span className="font-bold text-ink-900">{formatINR(selected.price)}</span>} />}
+              {isAdmin && <Info label="Price" value={<span className="font-bold text-ink-900">{formatINR(selected.price)}</span>} />}
             </dl>
 
             {selected.description && <p className="mt-4 text-sm leading-relaxed text-ink-600">{selected.description}</p>}
@@ -298,8 +299,14 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
                   </select>
                 </div>
                 <div className="mt-4 flex items-center justify-between rounded-2xl bg-brand-50 p-3.5">
-                  <span className="text-sm font-medium text-brand-800">Total payable</span>
-                  <span className="font-display text-xl font-extrabold text-brand-700">{formatINR(selected.price)}</span>
+                  {isAdmin ? (
+                    <>
+                      <span className="text-sm font-medium text-brand-800">Total payable</span>
+                      <span className="font-display text-xl font-extrabold text-brand-700">{formatINR(selected.price)}</span>
+                    </>
+                  ) : (
+                    <span className="text-sm font-medium text-brand-800">Submit booking — organizer will confirm pricing</span>
+                  )}
                 </div>
                 <button onClick={submitBooking} disabled={booking} className="btn-primary mt-3 w-full">{booking ? 'Processing…' : 'Confirm booking'}</button>
               </div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, formatDate, formatINR, daysUntil, dayOfEvent } from '../api';
-import type { Exhibition, Hall, Organizer, Seminar, Company, ExhibitionComment, ExhibitionMedia, MediaDoc } from '../types';
+import type { Exhibition, Hall, Organizer, Seminar, Company, ExhibitionComment, ExhibitionMedia, MediaDoc, User } from '../types';
 import { StatusBadge, Spinner } from '../components/ui';
 import FloorPlan from '../components/FloorPlan';
 import AttachedFloorPlan from '../components/AttachedFloorPlan';
@@ -30,13 +30,8 @@ const SECTIONS = [
   { id: 'gallery', label: 'Photos' },
   { id: 'comments', label: 'Reviews' },
   { id: 'schedule', label: 'Schedule' },
-  { id: 'location', label: 'Location' },
 ] as const;
 
-function mapsEmbedUrl(lat?: number, lng?: number, query?: string) {
-  if (lat != null && lng != null) return `https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`;
-  return `https://maps.google.com/maps?q=${encodeURIComponent(query || 'Bengaluru')}&z=14&output=embed`;
-}
 function mapsOpenUrl(lat?: number, lng?: number, query?: string) {
   if (lat != null && lng != null) return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query || 'Bengaluru')}`;
@@ -49,6 +44,8 @@ export default function ExhibitionDetail() {
   const { slug } = useParams();
   const { user } = useAuth();
   const canBook = user?.role === 'exhibitor' || user?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
+  const canManageMedia = isAdmin; // organizer tools = admin in this product
   const [data, setData] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -135,8 +132,7 @@ export default function ExhibitionDetail() {
 
   const day = data.status === 'live' ? dayOfEvent(data.start_date, data.end_date) : null;
   const startsIn = data.status === 'upcoming' ? daysUntil(data.start_date) : null;
-  const placeQuery = `${data.venue}, ${data.city}`;
-  const mapSrc = mapsEmbedUrl(data.lat, data.lng, placeQuery);
+  const placeQuery = data.address || `${data.venue}, ${data.city}`;
   const mapLink = mapsOpenUrl(data.lat, data.lng, placeQuery);
   const docs = data.documents?.length ? data.documents : [];
   const allPhotos = [...(data.gallery || []), ...photos.map((p) => p.url)].filter((v, i, a) => a.indexOf(v) === i);
@@ -182,7 +178,7 @@ export default function ExhibitionDetail() {
             </button>
             {canBook && data.status !== 'past' && (
               <button onClick={() => scrollTo('floor')} className="btn border-2 border-white/40 bg-white/10 px-5 py-2.5 text-white hover:bg-white/20">
-                Book stall · from {formatINR(data.price_from)}
+                {isAdmin ? `Book stall · from ${formatINR(data.price_from)}` : 'Book a stall'}
               </button>
             )}
             <button onClick={toggleFav} className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold backdrop-blur transition ${fav ? 'bg-brand text-white' : 'bg-white/15 text-white hover:bg-white/25'}`}>
@@ -263,9 +259,20 @@ export default function ExhibitionDetail() {
                   <Row icon={<Ticket width={16} />} label="Visitor entry" value={data.entry_free ? 'Free (register online)' : 'Paid visitor pass'} />
                   <Row icon={<Users width={16} />} label="Exhibitors" value={`${data.exhibitors.length} listed`} />
                 </dl>
-                {canBook && data.status !== 'past' && (
+                {data.address && (
+                  <p className="mt-3 text-xs leading-relaxed text-ink-500">{data.address}</p>
+                )}
+                <a
+                  href={mapLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-200 bg-brand-soft px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
+                >
+                  <MapPin width={15} /> Open in Google Maps
+                </a>
+                {isAdmin && data.status !== 'past' && (
                   <div className="mt-5 rounded-2xl bg-ink-50 p-3.5">
-                    <div className="text-[11px] uppercase tracking-wide text-ink-400">Exhibitor pricing</div>
+                    <div className="text-[11px] uppercase tracking-wide text-ink-400">Exhibitor pricing · admin</div>
                     <div className="font-display text-2xl font-extrabold text-ink-900">{formatINR(data.price_from)} <span className="text-sm font-medium text-ink-400">/ stall from</span></div>
                   </div>
                 )}
@@ -383,60 +390,94 @@ export default function ExhibitionDetail() {
           </div>
         </section>
 
-        {/* Reels */}
+        {/* Reels — compact phone tiles */}
         <section id="reels" className="scroll-mt-36">
-          <SectionTitle title="Reels & shorts" subtitle="Instagram and YouTube Shorts from the venue — add yours too." />
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {data.reel_url && (
-              <ReelCard url={data.reel_url} caption="Official event reel" author="Organizer" />
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <SectionTitle title="Reels & shorts" subtitle="Quick clips from the venue — swipe-friendly size." />
+            {canManageMedia && (
+              <span className="pill border border-brand-200 bg-brand-soft text-brand-700">Organizer / admin</span>
             )}
-            {reels.map((m) => (
-              <ReelCard key={m.id} url={m.url} caption={m.caption || 'Shared reel'} author={m.author_name} />
-            ))}
           </div>
-          <div className="mt-6">
-            <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="reel" onAdded={onMediaAdded} />
-          </div>
+          {(data.reel_url || reels.length > 0) ? (
+            <div className="mt-6 flex gap-3 overflow-x-auto pb-2">
+              {data.reel_url && (
+                <ReelCard url={data.reel_url} caption="Official event reel" author="Organizer" />
+              )}
+              {reels.map((m) => (
+                <ReelCard key={m.id} url={m.url} caption={m.caption || 'Shared reel'} author={m.author_name} />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-6 rounded-2xl border border-dashed border-ink-200 bg-ink-50 px-4 py-10 text-center text-sm text-ink-500">
+              No reels yet{canManageMedia ? ' — add one below.' : '.'}
+            </div>
+          )}
+          {canManageMedia ? (
+            <div className="mt-5">
+              <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="reel" onAdded={onMediaAdded} lockedKind="reel" />
+            </div>
+          ) : (
+            <p className="mt-4 text-xs text-ink-400">Only organizers and admins can add reels.</p>
+          )}
         </section>
 
-        {/* Videos */}
+        {/* Videos — compact grid */}
         <section id="videos" className="scroll-mt-36">
-          <SectionTitle title="Videos" subtitle="Walkthroughs and highlights. Paste a YouTube link or upload a short clip URL." />
-          <div className="mt-6 grid gap-5 lg:grid-cols-2">
-            {data.youtube_url && (
-              <VideoCard url={data.youtube_url} title="Official highlights" />
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <SectionTitle title="Videos" subtitle="Walkthroughs and highlights in a compact player." />
+            {canManageMedia && (
+              <span className="pill border border-brand-200 bg-brand-soft text-brand-700">Organizer / admin</span>
             )}
-            {videos.map((m) => (
-              <VideoCard key={m.id} url={m.url} title={m.caption || 'Shared video'} subtitle={`by ${m.author_name}`} />
-            ))}
           </div>
-          <div className="mt-6">
-            <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="video" onAdded={onMediaAdded} allowUpload />
-          </div>
+          {(data.youtube_url || videos.length > 0) ? (
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {data.youtube_url && (
+                <VideoCard url={data.youtube_url} title="Official highlights" />
+              )}
+              {videos.map((m) => (
+                <VideoCard key={m.id} url={m.url} title={m.caption || 'Shared video'} subtitle={`by ${m.author_name}`} />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-6 rounded-2xl border border-dashed border-ink-200 bg-ink-50 px-4 py-10 text-center text-sm text-ink-500">
+              No videos yet{canManageMedia ? ' — add one below.' : '.'}
+            </div>
+          )}
+          {canManageMedia ? (
+            <div className="mt-5">
+              <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="video" onAdded={onMediaAdded} allowUpload lockedKind="video" />
+            </div>
+          ) : (
+            <p className="mt-4 text-xs text-ink-400">Only organizers and admins can add videos.</p>
+          )}
         </section>
 
         {/* Gallery */}
         <section id="gallery" className="scroll-mt-36">
-          <SectionTitle title="Photo gallery" subtitle="Moments from the halls — upload or paste an image link." />
+          <SectionTitle title="Photo gallery" subtitle="Moments from the halls." />
           <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             {allPhotos.map((g, i) => (
               <button key={`${g}-${i}`} onClick={() => setLightbox(g)} className="group overflow-hidden rounded-2xl">
-                <img src={g} alt="" className="h-40 w-full object-cover transition-transform duration-500 group-hover:scale-105 md:h-48" />
+                <img src={g} alt="" className="h-32 w-full object-cover transition-transform duration-500 group-hover:scale-105 md:h-40" />
               </button>
             ))}
           </div>
-          <div className="mt-6">
-            <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="photo" onAdded={onMediaAdded} allowUpload />
-          </div>
+          {canManageMedia ? (
+            <div className="mt-5">
+              <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="photo" onAdded={onMediaAdded} allowUpload lockedKind="photo" />
+            </div>
+          ) : allPhotos.length === 0 ? (
+            <p className="mt-4 text-sm text-ink-400">Photos will appear here when the organizer adds them.</p>
+          ) : null}
         </section>
 
         {/* Comments / ratings */}
         <section id="comments" className="scroll-mt-36">
-          <SectionTitle title="Reviews & comments" subtitle={`${comments.length} visitor reviews${avgRating ? ` · ${avgRating}/5 average` : ''}`} />
+          <SectionTitle title="Reviews & comments" subtitle={`${comments.length} review${comments.length === 1 ? '' : 's'}${avgRating ? ` · ${avgRating}/5 average` : ''}`} />
           <Comments
             comments={comments}
             slug={data.slug}
-            defaultName={user?.name}
+            user={user}
             onPosted={(c) => setComments((prev) => [c, ...prev])}
           />
         </section>
@@ -464,35 +505,6 @@ export default function ExhibitionDetail() {
             ))}
           </div>
         </section>
-
-        {/* Location */}
-        <section id="location" className="scroll-mt-36">
-          <SectionTitle title="Venue & map" subtitle="Find your way to the exhibition centre." />
-          <div className="mt-6 grid gap-6 lg:grid-cols-3">
-            <div className="overflow-hidden rounded-3xl border border-ink-100 lg:col-span-2">
-              <iframe title={`${data.name} map`} src={mapSrc} className="h-[360px] w-full border-0 lg:h-[440px]" loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
-            </div>
-            <div className="rounded-3xl border border-ink-100 bg-white p-6 shadow-card">
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600"><MapPin width={24} /></div>
-              <div className="mt-4 text-xs font-bold uppercase tracking-wide text-ink-400">Venue</div>
-              <div className="mt-1 font-display text-lg font-bold text-ink-900">{data.venue}</div>
-              <p className="mt-2 text-sm leading-relaxed text-ink-600">{data.address || `${data.venue}, ${data.city}`}</p>
-              <a href={mapLink} target="_blank" rel="noreferrer" className="btn-primary mt-6 w-full"><MapPin width={16} /> Open in Google Maps</a>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      {/* Floating CTA */}
-      <div className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-ink-100 bg-white/95 px-2 py-2 shadow-soft backdrop-blur">
-        <button onClick={() => scrollTo('floor')} className="btn-primary rounded-full px-4 py-2 text-sm"><Grid width={15} /> Floor plan</button>
-        <button onClick={toggleFav} className={`rounded-full p-2.5 ${fav ? 'text-brand' : 'text-ink-500'}`} aria-label="Favourite">
-          <Heart width={18} style={fav ? { fill: 'currentColor' } : undefined} />
-        </button>
-        <button onClick={shareEvent} className="rounded-full p-2.5 text-ink-500" aria-label="Share"><ShareIcon /></button>
-        <button onClick={() => scrollTo('comments')} className="rounded-full px-3 py-2 text-sm font-semibold text-ink-600">
-          <Star width={14} className="mr-1 inline" style={{ color: '#fbbf24', fill: '#fbbf24' }} /> {avgRating || '—'}
-        </button>
       </div>
 
       {lightbox && (
@@ -563,20 +575,20 @@ function ReelCard({ url, caption, author }: { url: string; caption: string; auth
   const embed = toEmbedUrl(url);
   const kind = mediaKind(url);
   return (
-    <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-card">
-      <div className="relative mx-auto aspect-[9/16] max-h-[420px] w-full bg-ink-950">
+    <div className="w-[180px] shrink-0 overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm sm:w-[200px]">
+      <div className="relative aspect-[9/16] h-[340px] max-h-[380px] bg-ink-950 sm:h-[380px]">
         {embed ? (
           <iframe title={caption} src={embed} className="h-full w-full border-0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowFullScreen />
         ) : (
-          <a href={url} target="_blank" rel="noreferrer" className="grid h-full place-items-center p-4 text-center text-sm text-white/80">{url}</a>
+          <a href={url} target="_blank" rel="noreferrer" className="grid h-full place-items-center p-2 text-center text-[10px] text-white/80 break-all">{url}</a>
         )}
       </div>
-      <div className="p-3.5">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-brand-600">
-          {kind === 'instagram' ? <Instagram width={12} /> : <Youtube width={12} />} {kind === 'instagram' ? 'Instagram' : 'Short'}
+      <div className="p-2.5">
+        <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-brand-600">
+          {kind === 'instagram' ? <Instagram width={10} /> : <Youtube width={10} />} {kind === 'instagram' ? 'IG' : 'Short'}
         </div>
-        <div className="mt-1 text-sm font-semibold text-ink-900">{caption}</div>
-        <div className="text-xs text-ink-400">by {author}</div>
+        <div className="mt-0.5 line-clamp-1 text-xs font-semibold text-ink-900">{caption}</div>
+        <div className="truncate text-[10px] text-ink-400">{author}</div>
       </div>
     </div>
   );
@@ -585,17 +597,17 @@ function ReelCard({ url, caption, author }: { url: string; caption: string; auth
 function VideoCard({ url, title, subtitle }: { url: string; title: string; subtitle?: string }) {
   const embed = toEmbedUrl(url);
   return (
-    <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-card">
-      <div className="aspect-video bg-ink-950">
+    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm">
+      <div className="aspect-video max-h-[180px] bg-ink-950 sm:max-h-[200px]">
         {embed ? (
           <iframe title={title} src={embed} className="h-full w-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
         ) : (
           <video src={url} controls className="h-full w-full object-contain" />
         )}
       </div>
-      <div className="p-4">
-        <div className="font-semibold text-ink-900">{title}</div>
-        {subtitle && <div className="text-xs text-ink-400">{subtitle}</div>}
+      <div className="px-3 py-2.5">
+        <div className="line-clamp-1 text-sm font-semibold text-ink-900">{title}</div>
+        {subtitle && <div className="truncate text-[11px] text-ink-400">{subtitle}</div>}
       </div>
     </div>
   );
@@ -607,14 +619,16 @@ function AddMediaForm({
   defaultKind,
   onAdded,
   allowUpload,
+  lockedKind,
 }: {
   slug: string;
   defaultName?: string;
   defaultKind: 'video' | 'photo' | 'reel';
   onAdded: (m: ExhibitionMedia) => void;
   allowUpload?: boolean;
+  lockedKind?: 'video' | 'photo' | 'reel';
 }) {
-  const [kind, setKind] = useState<'video' | 'photo' | 'reel'>(defaultKind);
+  const [kind, setKind] = useState<'video' | 'photo' | 'reel'>(lockedKind || defaultKind);
   const [name, setName] = useState(defaultName || '');
   const [url, setUrl] = useState('');
   const [caption, setCaption] = useState('');
@@ -628,7 +642,7 @@ function AddMediaForm({
     setOk(false);
     setBusy(true);
     try {
-      const r = await api.post(`/exhibitions/${slug}/media`, { author_name: name, kind, url, caption });
+      const r = await api.post(`/exhibitions/${slug}/media`, { author_name: name || defaultName || 'Organizer', kind, url, caption });
       onAdded(r.data);
       setUrl('');
       setCaption('');
@@ -650,58 +664,57 @@ function AddMediaForm({
     const reader = new FileReader();
     reader.onload = () => {
       setUrl(String(reader.result || ''));
-      setKind(file.type.startsWith('video') ? 'video' : 'photo');
+      if (!lockedKind) setKind(file.type.startsWith('video') ? 'video' : 'photo');
       setError('');
     };
     reader.readAsDataURL(file);
   };
 
   return (
-    <form onSubmit={submit} className="rounded-3xl border border-ink-100 bg-white p-5 shadow-card">
-      <div className="mb-3">
-        <h3 className="font-display text-base font-bold text-ink-900">
-          {kind === 'reel' ? 'Add a reel link' : kind === 'video' ? 'Add / upload a video' : 'Add / upload a photo'}
-        </h3>
-        <p className="text-sm text-ink-500">
-          {kind === 'reel'
-            ? 'Paste Instagram Reel or YouTube Shorts URL.'
-            : kind === 'video'
-              ? 'Paste YouTube URL, or upload a short video file for this demo.'
-              : 'Paste an image URL, or upload a photo from your device.'}
-        </p>
+    <form onSubmit={submit} className="rounded-2xl border border-brand-100 bg-brand-soft/40 p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-bold text-ink-900">
+            Add {kind === 'reel' ? 'reel' : kind === 'video' ? 'video' : 'photo'}
+          </h3>
+          <p className="text-xs text-ink-500">Visible to everyone · only organizers & admins can publish</p>
+        </div>
       </div>
-      <div className="mb-3 flex flex-wrap gap-2">
-        {(['reel', 'video', 'photo'] as const).map((k) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setKind(k)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${kind === k ? 'bg-brand-600 text-white' : 'bg-ink-50 text-ink-600'}`}
-          >
-            {k}
-          </button>
-        ))}
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Your name" className="rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100" />
-        <input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Caption (optional)" className="rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100" />
+      {!lockedKind && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {(['reel', 'video', 'photo'] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setKind(k)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${kind === k ? 'bg-brand-600 text-white' : 'bg-white text-ink-600'}`}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Credit name" className="input py-2 text-sm" />
+        <input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="Caption (optional)" className="input py-2 text-sm" />
       </div>
       <input
         value={url.startsWith('data:') ? '' : url}
         onChange={(e) => setUrl(e.target.value)}
-        placeholder={kind === 'reel' ? 'https://instagram.com/reel/… or youtube.com/shorts/…' : kind === 'video' ? 'https://youtube.com/watch?v=…' : 'https://…/photo.jpg'}
-        className="mt-3 w-full rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100"
+        required={!url.startsWith('data:')}
+        placeholder={kind === 'reel' ? 'Instagram / YouTube Shorts URL' : kind === 'video' ? 'YouTube URL' : 'Image URL'}
+        className="input mt-2 py-2 text-sm"
       />
-      {url.startsWith('data:') && <p className="mt-2 text-xs text-emerald-600">File ready to upload ✓</p>}
+      {url.startsWith('data:') && <p className="mt-1.5 text-xs text-emerald-600">File ready ✓</p>}
       {allowUpload && (
-        <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-ink-200 bg-ink-50 px-4 py-3 text-sm font-medium text-ink-600 hover:border-brand hover:bg-brand-50/40">
-          <Bookmark width={16} /> Upload {kind === 'photo' ? 'image' : 'video'} file
+        <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-ink-200 bg-white px-3 py-2.5 text-xs font-medium text-ink-600 hover:border-brand">
+          <Bookmark width={14} /> Upload {kind === 'photo' ? 'image' : 'file'}
           <input type="file" accept={kind === 'photo' ? 'image/*' : 'video/*,image/*'} className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
         </label>
       )}
       {error && <p className="mt-2 text-sm text-brand-700">{error}</p>}
-      {ok && <p className="mt-2 text-sm text-emerald-600">Added — thanks for sharing!</p>}
-      <button type="submit" disabled={busy || !url} className="btn-primary mt-4">{busy ? 'Saving…' : `Add ${kind}`}</button>
+      {ok && <p className="mt-2 text-sm text-emerald-600">Published</p>}
+      <button type="submit" disabled={busy || !url} className="btn-primary mt-3 text-sm">{busy ? 'Saving…' : `Publish ${kind}`}</button>
     </form>
   );
 }
@@ -769,15 +782,14 @@ function FloorPlanSection({
 function Comments({
   comments,
   slug,
-  defaultName,
+  user,
   onPosted,
 }: {
   comments: ExhibitionComment[];
   slug: string;
-  defaultName?: string;
+  user: User | null;
   onPosted: (c: ExhibitionComment) => void;
 }) {
-  const [name, setName] = useState(defaultName || '');
   const [city, setCity] = useState('Bengaluru');
   const [body, setBody] = useState('');
   const [rating, setRating] = useState(5);
@@ -786,10 +798,16 @@ function Comments({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setError('');
     setBusy(true);
     try {
-      const r = await api.post(`/exhibitions/${slug}/comments`, { author_name: name, author_city: city, body, rating });
+      const r = await api.post(`/exhibitions/${slug}/comments`, {
+        author_name: user.name,
+        author_city: city,
+        body,
+        rating,
+      });
       onPosted(r.data);
       setBody('');
     } catch (err: unknown) {
@@ -801,39 +819,55 @@ function Comments({
   };
 
   return (
-    <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_1.2fr]">
-      <form onSubmit={submit} className="h-fit space-y-3 rounded-3xl border border-ink-100 bg-white p-5 shadow-card">
-        <h3 className="font-display text-base font-bold text-ink-900">Leave a review</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Your name" className="rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100" />
-          <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100" />
+    <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.15fr]">
+      {user ? (
+        <form onSubmit={submit} className="h-fit space-y-3 rounded-2xl border border-ink-100 bg-white p-5 shadow-card">
+          <div>
+            <h3 className="font-display text-base font-bold text-ink-900">Write a review</h3>
+            <p className="text-xs text-ink-400">Posting as <span className="font-semibold text-ink-700">{user.name}</span></p>
+          </div>
+          <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Your city" className="input py-2.5 text-sm" />
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} type="button" onClick={() => setRating(n)} aria-label={`${n} stars`}>
+                <Star width={22} style={{ color: n <= rating ? '#fbbf24' : '#d1d5db', fill: n <= rating ? '#fbbf24' : 'transparent' }} />
+              </button>
+            ))}
+            <span className="ml-2 text-xs text-ink-400">{rating}/5</span>
+          </div>
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} required rows={4} placeholder="Share your experience at this expo…" className="input min-h-[100px] text-sm" />
+          {error && <p className="text-sm text-brand-700">{error}</p>}
+          <button type="submit" disabled={busy} className="btn-primary w-full">{busy ? 'Posting…' : 'Post review'}</button>
+        </form>
+      ) : (
+        <div className="flex h-fit flex-col items-center justify-center rounded-2xl border border-dashed border-ink-200 bg-ink-50 px-6 py-12 text-center">
+          <Star width={28} className="text-amber-400" style={{ fill: '#fbbf24' }} />
+          <h3 className="mt-3 font-display text-lg font-bold text-ink-900">Sign in to leave a review</h3>
+          <p className="mt-1.5 max-w-xs text-sm text-ink-500">
+            Reviews help other visitors plan their trip. Create a free account or log in to post.
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <Link to="/login" state={{ from: `/exhibitions/${slug}` }} className="btn-primary px-5 py-2.5 text-sm">Sign in</Link>
+            <Link to="/register" className="btn-outline px-5 py-2.5 text-sm">Create account</Link>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button key={n} type="button" onClick={() => setRating(n)} aria-label={`${n} stars`}>
-              <Star width={20} style={{ color: n <= rating ? '#fbbf24' : '#d1d5db', fill: n <= rating ? '#fbbf24' : 'transparent' }} />
-            </button>
-          ))}
-          <span className="ml-2 text-xs text-ink-400">{rating}/5</span>
-        </div>
-        <textarea value={body} onChange={(e) => setBody(e.target.value)} required rows={4} placeholder="Share your experience…" className="w-full rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand-100" />
-        {error && <p className="text-sm text-brand-700">{error}</p>}
-        <button type="submit" disabled={busy} className="btn-primary">{busy ? 'Posting…' : 'Post review'}</button>
-      </form>
+      )}
 
       <div className="space-y-3">
         {comments.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-ink-200 bg-ink-50 py-12 text-center text-ink-500">No reviews yet — be the first.</div>
+          <div className="rounded-2xl border border-dashed border-ink-200 bg-white py-12 text-center text-sm text-ink-500">
+            No reviews yet — be the first after signing in.
+          </div>
         ) : comments.map((c) => (
-          <div key={c.id} className="rounded-2xl border border-ink-100 bg-white p-5 shadow-card">
+          <div key={c.id} className="rounded-2xl border border-ink-100 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-700">
+                <div className="grid h-9 w-9 place-items-center rounded-full bg-brand-50 text-sm font-bold text-brand-700">
                   {c.author_name.slice(0, 1).toUpperCase()}
                 </div>
                 <div>
-                  <div className="font-semibold text-ink-900">{c.author_name}</div>
-                  <div className="text-xs text-ink-400">{c.author_city || 'India'} · {formatDate(c.created_at.slice(0, 10))}</div>
+                  <div className="text-sm font-semibold text-ink-900">{c.author_name}</div>
+                  <div className="text-[11px] text-ink-400">{c.author_city || 'India'} · {formatDate(c.created_at.slice(0, 10))}</div>
                 </div>
               </div>
               <div className="flex items-center gap-0.5">
@@ -842,7 +876,7 @@ function Comments({
                 ))}
               </div>
             </div>
-            <p className="mt-3 text-sm leading-relaxed text-ink-600">{c.body}</p>
+            <p className="mt-2.5 text-sm leading-relaxed text-ink-600">{c.body}</p>
           </div>
         ))}
       </div>

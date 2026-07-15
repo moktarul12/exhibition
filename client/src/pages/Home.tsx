@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, formatINR, formatDateShort } from '../api';
+import { api, formatDateShort } from '../api';
 import type { Exhibition } from '../types';
 import { Spinner, SectionHeading } from '../components/ui';
 import ExhibitionCard from '../components/ExhibitionCard';
@@ -432,8 +432,11 @@ function FeaturedCard({ e }: { e: Exhibition }) {
         <div className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-500"><MapPin width={13} className="text-brand-500" /> <span className="line-clamp-1">{e.venue}, {e.city}</span></div>
         <div className="mt-3 flex items-end justify-between border-t border-ink-100 pt-3">
           <div>
-            <div className="text-[10px] text-ink-400">From</div>
-            <div className="font-display text-base font-extrabold text-ink-900">{formatINR(e.price_from)} <span className="text-[11px] font-medium text-ink-400">/sq.m</span></div>
+            <div className="text-[10px] text-ink-400">{e.available_stalls != null ? 'Available' : 'Stalls'}</div>
+            <div className="font-display text-base font-extrabold text-ink-900">
+              {e.available_stalls != null ? `${e.available_stalls}` : (e.total_stalls ?? '—')}
+              <span className="text-[11px] font-medium text-ink-400"> open</span>
+            </div>
           </div>
           <span className="text-ink-300 transition-colors group-hover:text-brand-500"><Bookmark width={18} /></span>
         </div>

@@ -279,16 +279,17 @@ app.get('/api/exhibitions/:slug/comments', async (req, res) => {
   res.json(list);
 });
 
-app.post('/api/exhibitions/:slug/comments', authOptional, async (req, res) => {
+app.post('/api/exhibitions/:slug/comments', authRequired, async (req, res) => {
   try {
     const e = one(await db.execute({ sql: 'SELECT id FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
     if (!e) return res.status(404).json({ error: 'Exhibition not found' });
-    const { author_name, author_city, body, rating = 5 } = req.body || {};
-    if (!author_name?.trim() || !body?.trim()) return res.status(400).json({ error: 'Name and comment are required' });
+    const { author_city, body, rating = 5 } = req.body || {};
+    if (!body?.trim()) return res.status(400).json({ error: 'Comment is required' });
+    const author_name = (req.body?.author_name?.trim() || req.user?.name || 'Visitor').trim();
     const r = await db.execute({
       sql: `INSERT INTO exhibition_comments (exhibition_id,user_id,author_name,author_city,body,rating)
             VALUES (?,?,?,?,?,?)`,
-      args: [e.id, req.user?.id || null, author_name.trim(), author_city?.trim() || null, body.trim(), Math.min(5, Math.max(1, Number(rating) || 5))],
+      args: [e.id, req.user.id, author_name, author_city?.trim() || null, body.trim(), Math.min(5, Math.max(1, Number(rating) || 5))],
     });
     const row = one(await db.execute({ sql: 'SELECT * FROM exhibition_comments WHERE id=?', args: [Number(r.lastInsertRowid)] }));
     res.status(201).json(row);
@@ -306,16 +307,17 @@ app.get('/api/exhibitions/:slug/media', async (req, res) => {
   res.json(list);
 });
 
-app.post('/api/exhibitions/:slug/media', authOptional, async (req, res) => {
+app.post('/api/exhibitions/:slug/media', authRequired, requireRole('admin'), async (req, res) => {
   try {
     const e = one(await db.execute({ sql: 'SELECT id, gallery FROM exhibitions WHERE slug=?', args: [req.params.slug] }));
     if (!e) return res.status(404).json({ error: 'Exhibition not found' });
     const { author_name, kind = 'photo', url, caption } = req.body || {};
-    if (!author_name?.trim() || !url?.trim()) return res.status(400).json({ error: 'Name and URL are required' });
+    if (!url?.trim()) return res.status(400).json({ error: 'URL is required' });
     const safeKind = ['video', 'reel', 'photo'].includes(kind) ? kind : 'photo';
+    const credit = (author_name?.trim() || req.user?.name || 'Organizer').trim();
     const r = await db.execute({
       sql: `INSERT INTO exhibition_media (exhibition_id,user_id,author_name,kind,url,caption) VALUES (?,?,?,?,?,?)`,
-      args: [e.id, req.user?.id || null, author_name.trim(), safeKind, url.trim(), caption?.trim() || null],
+      args: [e.id, req.user.id, credit, safeKind, url.trim(), caption?.trim() || null],
     });
     // Photos also append to gallery for immediate display
     if (safeKind === 'photo') {
