@@ -241,7 +241,7 @@ export default function ExhibitionDetail() {
                   { icon: Building, t: 'Live product demos', d: 'See launches and machinery in action across halls.' },
                   { icon: Users, t: 'Meet exhibitors', d: 'Tap any stall on the floor map to open company profiles.' },
                   { icon: Ticket, t: 'Seminars & talks', d: 'Expert sessions scheduled throughout the show days.' },
-                  { icon: Grid, t: 'Interactive floor plan', d: 'Find booths visually and save your favourites.' },
+                  { icon: Grid, t: '2D & 3D floor plan', d: 'Toggle views, filter available stalls, book in two steps.' },
                 ].map((f) => (
                   <div key={f.t} className="flex gap-3 rounded-2xl border border-ink-100 bg-white p-4">
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600"><f.icon width={18} /></span>

@@ -23,7 +23,7 @@ const INDUSTRIES = [
 ];
 
 const WHY = [
-  { icon: Layout, title: 'Interactive Floor Plans', desc: 'Pick your perfect stall with ease', bg: 'bg-brand-50 text-brand-600' },
+  { icon: Layout, title: 'Interactive Floor Plans', desc: '2D grid or immersive 3D — book in two taps', bg: 'bg-brand-50 text-brand-600' },
   { icon: Zap, title: 'Live Availability', desc: 'Real-time stall status at your fingertips', bg: 'bg-grape-100 text-grape-600' },
   { icon: Shield, title: 'Secure Payments', desc: '100% safe & transparent transactions', bg: 'bg-emerald-50 text-emerald-600' },
   { icon: Headset, title: 'Dedicated Support', desc: "We're here to help you succeed", bg: 'bg-amber-50 text-amber-600' },

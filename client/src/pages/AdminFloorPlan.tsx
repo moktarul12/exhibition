@@ -5,6 +5,8 @@ import type { Exhibition, FloorMarker, FloorMarkerKind, Hall, Stall, StallDispla
 import { Spinner, stallColors } from '../components/ui';
 import { Grid, Ticket, X, Plus, Trash2, Move, RefreshCw } from '../components/icons';
 import { hallMarkers, hallRowLayout, layoutStallTotal, MARKER_META, SIZE_META, stallSpans } from '../floorLayout';
+import FloorViewToggle, { type FloorViewMode } from '../components/FloorViewToggle';
+import FloorPlan3D from '../components/FloorPlan3D';
 
 const PRESETS: { label: string; layout: number[] }[] = [
   { label: 'Custom (10 / 5 / 8 / 6)', layout: [10, 5, 8, 6] },
@@ -129,6 +131,8 @@ export default function AdminFloorPlan() {
   const [showHallSettings, setShowHallSettings] = useState(false);
   const [dragPreview, setDragPreview] = useState<{ row: number; col: number; spanCols: number; spanRows: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [viewMode, setViewMode] = useState<FloorViewMode>('2d');
+  const [justPlacedId, setJustPlacedId] = useState<number | null>(null);
   const lastSelectedId = useRef<number | null>(null);
   const dragGroupRef = useRef<number[] | null>(null);
 
@@ -568,6 +572,8 @@ export default function AdminFloorPlan() {
       setSelected(r.data);
       setSelectedIds(new Set([r.data.id]));
       setSelectedMarkerId(null);
+      setJustPlacedId(r.data.id);
+      setTimeout(() => setJustPlacedId(null), 900);
       setPlaceTool({ kind: 'stall' });
       setDraftMergeId(size.id);
       setMarkerPaint({ span_cols: size.span_cols, span_rows: size.span_rows });
@@ -1492,22 +1498,60 @@ export default function AdminFloorPlan() {
                 </div>
               )}
 
-              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ink-100 px-4 py-2">
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ink-100 bg-gradient-to-r from-white to-grape-50/40 px-4 py-2">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="pill bg-ink-900 text-white">
+                  <span className={`pill text-white ${
+                    placeTool.kind === 'stall' ? 'bg-brand' : 'bg-grape-600'
+                  }`}>
                     {PLACE_OPTIONS.find((o) => o.value === currentTypeValue)?.icon}{' '}
                     {PLACE_OPTIONS.find((o) => o.value === currentTypeValue)?.label || 'Stall'}
                   </span>
                   <span className="pill border border-ink-200 bg-white text-ink-600">{currentMerge.label}</span>
-                  {selected && <span className="pill border border-brand-200 bg-brand-soft text-brand-700">{selected.code}</span>}
+                  {selected && <span className="pill border border-brand-200 bg-brand-soft text-brand-700 animate-pop">{selected.code}</span>}
+                  <FloorViewToggle value={viewMode} onChange={setViewMode} />
                 </div>
-                <span className="text-[11px] font-medium text-ink-400">{stalls.length} stalls · {markers.items.length} amenities</span>
+                <div className="flex items-center gap-3 text-[11px] font-medium text-ink-400">
+                  <span>{stalls.length} stalls · {markers.items.length} amenities</span>
+                  {stalls.length > 0 && (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700">
+                      {stalls.filter((s) => s.status === 'available').length} free
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <div className="relative min-h-0 flex-1 overflow-auto bg-[linear-gradient(to_bottom,#f8f7fb,white)] p-4">
+              {inspectorMode === 'place' && viewMode === '2d' && (
+                <div className="shrink-0 border-b border-brand-100 bg-brand-soft/60 px-4 py-2 text-center text-xs font-semibold text-brand-800 animate-fade-in">
+                  Place mode · pick size below → click a <span className="rounded bg-white px-1.5 py-0.5 font-bold text-brand-600">+</span> cell
+                  {draftMerge.label !== '1×1' && <> · painting <b>{draftMerge.label}</b></>}
+                </div>
+              )}
+
+              <div className="relative min-h-0 flex-1 overflow-auto floor-canvas p-4">
+                {viewMode === '3d' ? (
+                  <div className="mx-auto max-w-4xl animate-fade-in">
+                    <FloorPlan3D
+                      layout={layout}
+                      stalls={stalls}
+                      markers={markers.items}
+                      entranceLabel={entranceLabel}
+                      exitLabel={exitLabel}
+                      selectedId={selected?.id}
+                      selectedIds={selectedIds}
+                      onStallClick={(stall) => selectStall(stall)}
+                    />
+                    <p className="mt-3 text-center text-xs text-ink-500">
+                      3D preview · tap to select · switch to{' '}
+                      <button type="button" className="font-bold text-grape-700 underline" onClick={() => setViewMode('2d')}>2D</button>
+                      {' '}to place, merge or drag
+                    </p>
+                  </div>
+                ) : (
                 <div className="flex justify-center">
-                  <div className="inline-block rounded-2xl border border-ink-100 bg-white p-4 shadow-sm">
-                    <div className="mb-2 rounded-lg bg-ink-900 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-white">
+                  <div className="inline-block rounded-2xl border border-ink-100/80 bg-white/90 p-4 shadow-lg shadow-ink-900/5 backdrop-blur-sm">
+                    <div className="mb-2 overflow-hidden rounded-lg bg-grad py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-white shadow-sm"
+                      style={{ backgroundImage: 'linear-gradient(90deg,#059669,#10b981,#34d399,#059669)', backgroundSize: '200% 100%' }}
+                    >
                       {entranceLabel}
                     </div>
                     <div
@@ -1546,10 +1590,10 @@ export default function AdminFloorPlan() {
                             onDragOver={(e) => onDragOverCell(e, row, col)}
                             onDragLeave={() => setDragOver((d) => (d === key ? null : d))}
                             onDrop={(e) => onDropCell(e, row, col)}
-                            className={`rounded-md border border-dashed text-[10px] font-semibold transition-colors ${
+                            className={`rounded-lg border border-dashed text-[10px] font-semibold transition-all duration-150 ${
                               dragOver === key || inPreview
-                                ? 'border-brand-500 bg-brand-50 text-brand-700'
-                                : 'border-ink-200 bg-ink-50/50 text-ink-300 hover:border-brand-300 hover:bg-brand-soft/30'
+                                ? 'place-ghost border-brand-500 bg-brand-100 text-brand-700 scale-105 shadow-md shadow-brand/20'
+                                : 'border-ink-200 bg-ink-50/50 text-ink-300 hover:scale-[1.03] hover:border-brand-300 hover:bg-brand-soft/40 hover:text-brand-500'
                             }`}
                           >
                             +
@@ -1564,6 +1608,7 @@ export default function AdminFloorPlan() {
                         const isPending = pendingNextStall?.id === stall.id;
                         const isBeingDragged = isDragging && (selectedIds.has(stall.id) || selected?.id === stall.id);
                         const willAbsorb = footprintAbsorbIds.has(stall.id);
+                        const justPlaced = justPlacedId === stall.id;
                         return (
                           <button
                             key={stall.id}
@@ -1575,12 +1620,14 @@ export default function AdminFloorPlan() {
                             onDragOver={(e) => onDragOverCell(e, stall.grid_row, stall.grid_col)}
                             onDrop={(e) => onDropCell(e, stall.grid_row, stall.grid_col)}
                             style={cellStyle(stall.grid_row, stall.grid_col, span_cols, span_rows)}
-                            className={`relative z-10 grid cursor-grab place-items-center rounded-lg border font-bold active:cursor-grabbing ${c.bg} ${c.border} ${c.text} ${
+                            className={`stall-tile relative z-10 grid cursor-grab place-items-center rounded-xl border font-bold active:cursor-grabbing ${c.bg} ${c.border} ${c.text} ${
+                              stall.status === 'available' ? 'stall-tile-available' : stall.status === 'booked' ? 'stall-tile-booked' : ''
+                            } ${
                               isPending ? 'ring-2 ring-amber-500 ring-offset-1'
-                                : isSel ? 'z-20 ring-2 ring-brand-600 ring-offset-1'
+                                : isSel ? 'stall-tile-selected z-20'
                                 : willAbsorb ? 'z-20 ring-2 ring-amber-400 ring-offset-1 opacity-75'
                                 : ''
-                            } ${isBeingDragged ? 'opacity-40' : ''} ${span_cols * span_rows > 1 ? 'text-[11px]' : 'text-[10px]'}`}
+                            } ${isBeingDragged ? 'opacity-40' : ''} ${justPlaced ? 'animate-pop animate-glow-pulse' : ''} ${span_cols * span_rows > 1 ? 'text-[11px]' : 'text-[10px]'}`}
                           >
                             <span className="px-1 text-center leading-tight">{stall.code}</span>
                             {willAbsorb && (
@@ -1669,6 +1716,7 @@ export default function AdminFloorPlan() {
                     </div>
                   </div>
                 </div>
+                )}
               </div>
 
               <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink-100 px-4 py-2">
@@ -1719,8 +1767,16 @@ export default function AdminFloorPlan() {
 
                 {inspectorMode === 'place' && (
                   <>
+                    <div className="rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50/80 to-white p-3 animate-fade-in">
+                      <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-brand-600">Quick start</div>
+                      <ol className="space-y-1 text-[11px] leading-snug text-ink-600">
+                        <li><b>1.</b> Choose Stall or amenity</li>
+                        <li><b>2.</b> Pick cell size (1×1 → 3×3)</li>
+                        <li><b>3.</b> Click a <b>+</b> on the hall</li>
+                      </ol>
+                    </div>
                     <div>
-                      <PanelHead title="What to place" hint="Pick a type, then click an empty cell (+)" />
+                      <PanelHead title="What to place" hint="Then click an empty cell (+)" />
                       <div className="grid grid-cols-3 gap-1.5">
                         {PLACE_OPTIONS.map((o) => (
                           <button
@@ -1728,11 +1784,13 @@ export default function AdminFloorPlan() {
                             type="button"
                             onClick={() => { void onTypeDropdownChange(o.value); }}
                             disabled={saving}
-                            className={`flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2 text-[10px] font-semibold transition-colors ${
-                              currentTypeValue === o.value ? 'border-brand-500 bg-brand-soft text-brand-700' : 'border-ink-100 bg-white text-ink-600 hover:border-ink-200'
+                            className={`flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2.5 text-[10px] font-semibold transition-all duration-150 ${
+                              currentTypeValue === o.value
+                                ? 'scale-[1.03] border-brand-500 bg-brand-soft text-brand-700 shadow-md shadow-brand/15'
+                                : 'border-ink-100 bg-white text-ink-600 hover:border-ink-200 hover:scale-[1.02]'
                             }`}
                           >
-                            <span className="text-base leading-none">{o.icon}</span>
+                            <span className="text-lg leading-none">{o.icon}</span>
                             {o.label}
                           </button>
                         ))}
@@ -1772,12 +1830,15 @@ export default function AdminFloorPlan() {
                         key={m.id}
                         type="button"
                         onClick={() => setDraftMergeId(m.id)}
-                        className={`flex flex-col items-center gap-1 rounded-xl border px-2 py-2 transition-colors ${
-                          draftMergeId === m.id ? 'border-brand-500 bg-brand-soft' : 'border-ink-100 bg-white hover:border-ink-200'
+                        className={`flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 transition-all duration-150 ${
+                          draftMergeId === m.id
+                            ? 'scale-[1.04] border-brand-500 bg-brand-soft shadow-md shadow-brand/15'
+                            : 'border-ink-100 bg-white hover:border-ink-200 hover:scale-[1.02]'
                         }`}
                       >
                         <MergeIcon cols={m.span_cols} rows={m.span_rows} active={draftMergeId === m.id} />
                         <span className="text-xs font-bold text-ink-900">{m.label}</span>
+                        <span className="text-[9px] text-ink-400">{m.hint}</span>
                       </button>
                     ))}
                   </div>

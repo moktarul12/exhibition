@@ -129,5 +129,83 @@ h1, h2, h3, h4, .font-display {
 .animate-fade-in { animation: fadeIn .4s ease both; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px);} to { opacity:1; transform: translateY(0);} }
 
+.animate-pop { animation: popIn .45s cubic-bezier(.22,1.2,.36,1) both; }
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.72); }
+  60% { transform: scale(1.06); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-slide-up { animation: slideUp .4s ease both; }
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-stall-in { animation: stallIn .5s cubic-bezier(.22,1,.36,1) both; }
+@keyframes stallIn {
+  from { opacity: 0; transform: scale(.5) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-glow-pulse { animation: glowPulse 1.8s ease-in-out infinite; }
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(214,32,110,0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(214,32,110,0); }
+}
+
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 2.2s linear infinite;
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.floor-canvas {
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(214,32,110,0.06), transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(124,58,237,0.07), transparent 45%),
+    linear-gradient(180deg, #f7f5fb 0%, #ffffff 55%);
+}
+
+.stall-tile {
+  @apply relative overflow-hidden transition-all duration-200;
+}
+.stall-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.35), transparent 50%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .2s;
+}
+.stall-tile:hover::after { opacity: 1; }
+.stall-tile-available {
+  box-shadow: 0 2px 0 #059669, 0 6px 16px -8px rgba(5,150,105,.45);
+}
+.stall-tile-available:hover {
+  transform: translateY(-3px) scale(1.04);
+  box-shadow: 0 4px 0 #059669, 0 14px 24px -10px rgba(5,150,105,.5);
+}
+.stall-tile-booked {
+  box-shadow: 0 2px 0 #be185d, 0 6px 16px -8px rgba(214,32,110,.35);
+}
+.stall-tile-selected {
+  transform: translateY(-4px) scale(1.06);
+  z-index: 20;
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px #d6206e, 0 16px 32px -12px rgba(214,32,110,.55) !important;
+}
+
+.place-ghost {
+  animation: ghostPulse 1.1s ease-in-out infinite;
+}
+@keyframes ghostPulse {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
