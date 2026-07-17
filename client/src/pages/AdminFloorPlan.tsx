@@ -7,6 +7,7 @@ import { Grid, Ticket, X, Plus, Trash2, Move, RefreshCw } from '../components/ic
 import { hallMarkers, hallRowLayout, layoutStallTotal, MARKER_META, SIZE_META, stallSpans } from '../floorLayout';
 import FloorViewToggle, { type FloorViewMode } from '../components/FloorViewToggle';
 import FloorPlan3D from '../components/FloorPlan3D';
+import FloorPlan2D from '../components/FloorPlan2D';
 
 const PRESETS: { label: string; layout: number[] }[] = [
   { label: 'Custom (10 / 5 / 8 / 6)', layout: [10, 5, 8, 6] },
@@ -43,9 +44,6 @@ function defaultMarkerSpans(kind: FloorMarkerKind, paint: { span_cols: number; s
   if (kind === 'lounge') return { span_cols: Math.max(2, paint.span_cols || 2), span_rows: paint.span_rows || 1 };
   return { span_cols: paint.span_cols || 1, span_rows: paint.span_rows || 1 };
 }
-
-const CELL = 52;
-const GAP = 6;
 
 type DragPayload =
   | { type: 'stall'; id: number }
@@ -1203,6 +1201,42 @@ export default function AdminFloorPlan() {
     }
   };
 
+  /** Outer + on a row bay: fill first empty slot, or grow the row then place */
+  const addToRow = async (row: number) => {
+    if (!hallId || saving) return;
+    const rowLen = layout[row] || 0;
+    for (let col = 0; col < rowLen; col++) {
+      if (!occupied.has(`${row}:${col}`)) {
+        if (placeTool.kind === 'marker') {
+          await placeOrMoveMarker({ kind: placeTool.marker }, row, col);
+        } else {
+          await addStallAt(row, col);
+        }
+        return;
+      }
+    }
+    const nextLayout = layout.map((n, i) => (i === row ? n + 1 : n));
+    setSaving(true);
+    try {
+      await api.patch(`/admin/halls/${hallId}`, {
+        name: hallNameEdit.trim() || hall?.name,
+        row_layout: nextLayout,
+        markers: { ...markers, entrance_label: entranceLabel, exit_label: exitLabel },
+      });
+      await reloadHalls(selectedSlug, hallId);
+    } catch {
+      alert('Could not extend row');
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
+    if (placeTool.kind === 'marker') {
+      await placeOrMoveMarker({ kind: placeTool.marker }, row, rowLen);
+    } else {
+      await addStallAt(row, rowLen);
+    }
+  };
+
   const onDragStart = (e: React.DragEvent, payload: DragPayload) => {
     e.dataTransfer.setData('application/x-floor', JSON.stringify(payload));
     e.dataTransfer.effectAllowed = 'move';
@@ -1304,11 +1338,6 @@ export default function AdminFloorPlan() {
   };
 
   if (loading) return <Spinner label="Loading floor plans…" />;
-
-  const cellStyle = (row: number, col: number, spanCols = 1, spanRows = 1): React.CSSProperties => ({
-    gridColumn: `${col + 1} / span ${spanCols}`,
-    gridRow: `${row + 1} / span ${spanRows}`,
-  });
 
   const MergeIcon = ({ cols, rows, active }: { cols: number; rows: number; active?: boolean }) => (
     <span
@@ -1522,7 +1551,7 @@ export default function AdminFloorPlan() {
 
               {inspectorMode === 'place' && viewMode === '2d' && (
                 <div className="shrink-0 border-b border-brand-100 bg-brand-soft/60 px-4 py-2 text-center text-xs font-semibold text-brand-800 animate-fade-in">
-                  Place mode · pick size below → click a <span className="rounded bg-white px-1.5 py-0.5 font-bold text-brand-600">+</span> cell
+                  Place mode · click <span className="rounded bg-white px-1.5 py-0.5 font-bold text-brand-600">+</span> in a row bay, or the outer <b>Add</b> to extend a row
                   {draftMerge.label !== '1×1' && <> · painting <b>{draftMerge.label}</b></>}
                 </div>
               )}
@@ -1547,175 +1576,58 @@ export default function AdminFloorPlan() {
                     </p>
                   </div>
                 ) : (
-                <div className="flex justify-center">
-                  <div className="inline-block rounded-2xl border border-ink-100/80 bg-white/90 p-4 shadow-lg shadow-ink-900/5 backdrop-blur-sm">
-                    <div className="mb-2 overflow-hidden rounded-lg bg-grad py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-white shadow-sm"
-                      style={{ backgroundImage: 'linear-gradient(90deg,#059669,#10b981,#34d399,#059669)', backgroundSize: '200% 100%' }}
-                    >
-                      {entranceLabel}
-                    </div>
-                    <div
-                      className="relative"
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(${maxCols}, ${CELL}px)`,
-                        gridTemplateRows: `repeat(${rowsN}, ${CELL}px)`,
-                        gap: GAP,
-                        width: maxCols * CELL + (maxCols - 1) * GAP,
+                  <div className="animate-fade-in">
+                    <FloorPlan2D
+                      layout={layout}
+                      stalls={stalls}
+                      markers={markers.items}
+                      entranceLabel={entranceLabel}
+                      exitLabel={exitLabel}
+                      editMode
+                      saving={saving}
+                      selectedId={selected?.id}
+                      selectedIds={selectedIds}
+                      selectedMarkerId={selectedMarkerId}
+                      hoverCell={hoverCell}
+                      onHoverCell={setHoverCell}
+                      previewCells={previewCells}
+                      footprintCells={selectionFootprint}
+                      justPlacedId={justPlacedId}
+                      pendingStallId={pendingNextStall?.id ?? null}
+                      absorbStallIds={footprintAbsorbIds}
+                      dragging={isDragging}
+                      dragStallIds={selectedIds}
+                      dragOverKey={dragOver}
+                      onEmptyClick={onCellAction}
+                      onAddToRow={addToRow}
+                      onStallClick={(stall, e) => selectStall(stall, e)}
+                      onMarkerClick={(m) => {
+                        setSelectedMarkerId(m.id);
+                        setSelected(null);
+                        setSelectedIds(new Set());
+                        setPlaceTool({ kind: 'marker', marker: m.kind });
+                        setMarkerPaint({ span_cols: m.span_cols || 1, span_rows: m.span_rows || 1 });
+                        const hit = MERGE_SIZES.find((x) => x.span_cols === (m.span_cols || 1) && x.span_rows === (m.span_rows || 1));
+                        setDraftMergeId(hit?.id || '1x1');
+                        setStallDirty(false);
+                        setPendingNextStall(null);
                       }}
-                    >
-                      {Array.from({ length: rowsN * maxCols }).map((_, idx) => {
-                        const row = Math.floor(idx / maxCols);
-                        const col = idx % maxCols;
-                        const inLayout = col < (layout[row] || 0);
-                        const key = `${row}:${col}`;
-                        const isOcc = occupied.has(key);
-                        const inPreview = previewCells.has(key);
-                        if (!inLayout) return <div key={key} style={cellStyle(row, col)} />;
-                        const isOriginStall = stalls.some((s) => s.grid_row === row && s.grid_col === col);
-                        const isOriginMarker = markers.items.some((m) => m.grid_row === row && m.grid_col === col);
-                        if (isOriginStall || isOriginMarker) return <div key={key} style={cellStyle(row, col)} />;
-                        if (isOcc) {
-                          return <div key={key} style={cellStyle(row, col)} className={`pointer-events-none rounded-md ${inPreview ? 'bg-brand-200/50 ring-1 ring-brand-400' : ''}`} />;
-                        }
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            style={cellStyle(row, col)}
-                            onClick={() => onCellAction(row, col)}
-                            disabled={saving}
-                            onMouseEnter={() => setHoverCell({ row, col })}
-                            onMouseLeave={() => setHoverCell((h) => (h?.row === row && h?.col === col ? null : h))}
-                            onDragOver={(e) => onDragOverCell(e, row, col)}
-                            onDragLeave={() => setDragOver((d) => (d === key ? null : d))}
-                            onDrop={(e) => onDropCell(e, row, col)}
-                            className={`rounded-lg border border-dashed text-[10px] font-semibold transition-all duration-150 ${
-                              dragOver === key || inPreview
-                                ? 'place-ghost border-brand-500 bg-brand-100 text-brand-700 scale-105 shadow-md shadow-brand/20'
-                                : 'border-ink-200 bg-ink-50/50 text-ink-300 hover:scale-[1.03] hover:border-brand-300 hover:bg-brand-soft/40 hover:text-brand-500'
-                            }`}
-                          >
-                            +
-                          </button>
-                        );
-                      })}
-
-                      {stalls.map((stall) => {
-                        const { span_cols, span_rows } = stallSpans(stall);
-                        const c = stallColors[stall.status];
-                        const isSel = selectedIds.has(stall.id) || selected?.id === stall.id;
-                        const isPending = pendingNextStall?.id === stall.id;
-                        const isBeingDragged = isDragging && (selectedIds.has(stall.id) || selected?.id === stall.id);
-                        const willAbsorb = footprintAbsorbIds.has(stall.id);
-                        const justPlaced = justPlacedId === stall.id;
-                        return (
-                          <button
-                            key={stall.id}
-                            type="button"
-                            draggable={!stallDirty || selected?.id === stall.id}
-                            onDragStart={(e) => onDragStart(e, { type: 'stall', id: stall.id })}
-                            onDragEnd={onDragEnd}
-                            onClick={(e) => selectStall(stall, e)}
-                            onDragOver={(e) => onDragOverCell(e, stall.grid_row, stall.grid_col)}
-                            onDrop={(e) => onDropCell(e, stall.grid_row, stall.grid_col)}
-                            style={cellStyle(stall.grid_row, stall.grid_col, span_cols, span_rows)}
-                            className={`stall-tile relative z-10 grid cursor-grab place-items-center rounded-xl border font-bold active:cursor-grabbing ${c.bg} ${c.border} ${c.text} ${
-                              stall.status === 'available' ? 'stall-tile-available' : stall.status === 'booked' ? 'stall-tile-booked' : ''
-                            } ${
-                              isPending ? 'ring-2 ring-amber-500 ring-offset-1'
-                                : isSel ? 'stall-tile-selected z-20'
-                                : willAbsorb ? 'z-20 ring-2 ring-amber-400 ring-offset-1 opacity-75'
-                                : ''
-                            } ${isBeingDragged ? 'opacity-40' : ''} ${justPlaced ? 'animate-pop animate-glow-pulse' : ''} ${span_cols * span_rows > 1 ? 'text-[11px]' : 'text-[10px]'}`}
-                          >
-                            <span className="px-1 text-center leading-tight">{stall.code}</span>
-                            {willAbsorb && (
-                              <span className="absolute inset-x-0 top-0 rounded-t-md bg-amber-500 py-px text-center text-[7px] font-bold uppercase text-white">Merge</span>
-                            )}
-                          </button>
-                        );
-                      })}
-
-                      {markers.items.map((m) => {
-                        const meta = MARKER_META[m.kind] || MARKER_META.custom;
-                        const isBeingDragged = isDragging && selectedMarkerId === m.id;
-                        const inBlockedFoot = selectionFootprint.some(
-                          (cell) => cell.kind === 'blocked'
-                            && cell.row >= m.grid_row && cell.row < m.grid_row + (m.span_rows || 1)
-                            && cell.col >= m.grid_col && cell.col < m.grid_col + (m.span_cols || 1),
-                        );
-                        return (
-                          <button
-                            key={m.id}
-                            type="button"
-                            draggable
-                            onDragStart={(e) => onDragStart(e, { type: 'marker', id: m.id })}
-                            onDragEnd={onDragEnd}
-                            onClick={() => {
-                              setSelectedMarkerId(m.id);
-                              setSelected(null);
-                              setSelectedIds(new Set());
-                              setPlaceTool({ kind: 'marker', marker: m.kind });
-                              setMarkerPaint({ span_cols: m.span_cols || 1, span_rows: m.span_rows || 1 });
-                              const hit = MERGE_SIZES.find((x) => x.span_cols === (m.span_cols || 1) && x.span_rows === (m.span_rows || 1));
-                              setDraftMergeId(hit?.id || '1x1');
-                              setStallDirty(false);
-                              setPendingNextStall(null);
-                            }}
-                            onDragOver={(e) => onDragOverCell(e, m.grid_row, m.grid_col)}
-                            onDrop={(e) => onDropCell(e, m.grid_row, m.grid_col)}
-                            style={cellStyle(m.grid_row, m.grid_col, m.span_cols || 1, m.span_rows || 1)}
-                            className={`z-10 grid cursor-grab place-items-center rounded-lg border p-0.5 text-[9px] font-bold leading-tight active:cursor-grabbing ${meta.className} ${
-                              selectedMarkerId === m.id ? 'z-20 ring-2 ring-brand-600 ring-offset-1' : inBlockedFoot ? 'ring-2 ring-red-500 ring-offset-1' : ''
-                            } ${isBeingDragged ? 'opacity-40' : ''}`}
-                          >
-                            <span className="text-center">{AMENITY_COPY[m.kind]?.icon || '📍'}<br />{m.label}</span>
-                          </button>
-                        );
-                      })}
-
-                      {selectionFootprint.length > 0 && (() => {
-                        const minR = Math.min(...selectionFootprint.map((c) => c.row));
-                        const minC = Math.min(...selectionFootprint.map((c) => c.col));
-                        const maxR = Math.max(...selectionFootprint.map((c) => c.row));
-                        const maxC = Math.max(...selectionFootprint.map((c) => c.col));
-                        const spanCols = maxC - minC + 1;
-                        const spanRows = maxR - minR + 1;
-                        const bad = footprintBlocked;
-                        return (
-                          <>
-                            {selectionFootprint.map((cell) => {
-                              if (cell.kind === 'self') return null;
-                              if (cell.row < 0 || cell.col < 0 || cell.row >= rowsN || cell.col >= maxCols) return null;
-                              const tone = cell.kind === 'blocked' || cell.kind === 'oob'
-                                ? 'border-red-500 bg-red-400/30'
-                                : cell.kind === 'absorb'
-                                  ? 'border-amber-500 bg-amber-300/35'
-                                  : 'border-brand-500 bg-brand-300/30';
-                              return (
-                                <div key={`foot-${cell.key}`} style={cellStyle(cell.row, cell.col)} className={`pointer-events-none z-[15] rounded-lg border-2 border-dashed ${tone}`} />
-                              );
-                            })}
-                            <div style={cellStyle(minR, minC, spanCols, spanRows)} className={`pointer-events-none z-[16] rounded-lg border-2 ${bad ? 'border-red-500' : sizeDirty ? 'border-amber-500' : 'border-brand-600'}`} />
-                          </>
-                        );
-                      })()}
-
-                      {isDragging && dragPreview && hoverCell && (
-                        <div
-                          style={cellStyle(hoverCell.row, hoverCell.col, dragPreview.spanCols, dragPreview.spanRows)}
-                          className="pointer-events-none z-20 grid place-items-center rounded-lg border-2 border-brand-500 bg-brand-100/70 text-brand-700"
-                        >
-                          <Move width={16} />
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-2 rounded-lg bg-ink-100 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-ink-500">
-                      {exitLabel}
-                    </div>
+                      onStallDragStart={(e, stall) => onDragStart(e, { type: 'stall', id: stall.id })}
+                      onStallDragEnd={onDragEnd}
+                      onMarkerDragStart={(e, m) => onDragStart(e, { type: 'marker', id: m.id })}
+                      onMarkerDragEnd={onDragEnd}
+                      onEmptyDragOver={(e, row, col) => onDragOverCell(e, row, col)}
+                      onEmptyDrop={(e, row, col) => onDropCell(e, row, col)}
+                      onEmptyDragLeave={(row, col) =>
+                        setDragOver((d) => (d === `${row}:${col}` ? null : d))
+                      }
+                    />
+                    {sizeDirty && (selected || selectedMarkerId) && (
+                      <p className="mt-2 text-center text-[11px] font-semibold text-amber-700">
+                        Size preview active — Apply in the inspector to save
+                      </p>
+                    )}
                   </div>
-                </div>
                 )}
               </div>
 
@@ -1738,7 +1650,7 @@ export default function AdminFloorPlan() {
                   {inspectorMode === 'place' ? 'Place mode' : inspectorMode === 'multi' ? 'Multi-select' : 'Edit selection'}
                 </div>
                 <div className="font-display text-base font-extrabold text-ink-900">
-                  {inspectorMode === 'place' && 'Click + on the grid'}
+                  {inspectorMode === 'place' && 'Click + in a row · or outer Add'}
                   {inspectorMode === 'stall' && selected?.code}
                   {inspectorMode === 'amenity' && (markers.items.find((x) => x.id === selectedMarkerId)?.label || 'Amenity')}
                   {inspectorMode === 'multi' && `${selectedIds.size} stalls`}

@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, formatINR } from '../api';
 import type { Hall, Stall, StallStatus } from '../types';
 import { stallColors } from './ui';
 import { useAuth } from '../auth';
-import { Search, X, Check, Grid, Download, Phone, Mail, Globe, ArrowRight, Building, Zap } from './icons';
+import { Search, X, Check, Grid, Download, Phone, Mail, Globe, ArrowRight, Building } from './icons';
 import { toEmbedUrl } from '../media';
-import { hallRowLayout, hallMarkers, stallSpans, MARKER_META } from '../floorLayout';
+import { hallRowLayout, hallMarkers } from '../floorLayout';
 import FloorViewToggle, { type FloorViewMode } from './FloorViewToggle';
 import FloorPlan3D from './FloorPlan3D';
+import FloorPlan2D from './FloorPlan2D';
 
 type StatusFilter = 'all' | StallStatus;
 
@@ -24,11 +25,10 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [availableOnly, setAvailableOnly] = useState(false);
-  const [viewMode, setViewMode] = useState<FloorViewMode>('2d');
+  const [viewMode, setViewMode] = useState<FloorViewMode>('3d');
   const [bookStep, setBookStep] = useState<1 | 2>(1);
   const [booking, setBooking] = useState(false);
   const [confirmed, setConfirmed] = useState<{ reference: string } | null>(null);
-  const [hoverId, setHoverId] = useState<number | null>(null);
   const [form, setForm] = useState({
     company_name: '', contact_person: '', contact_email: '', contact_phone: '', payment_mode: 'UPI',
   });
@@ -36,10 +36,6 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
   const hall = halls.find((h) => h.id === hallId);
   const layout = hallRowLayout(hall);
   const markers = hallMarkers(hall);
-  const maxCols = Math.max(...layout, 1);
-  const rowsN = layout.length;
-  const CELL = 56;
-  const GAP = 7;
 
   const loadStalls = () => {
     if (!hallId) return;
@@ -59,8 +55,6 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
   }, [stalls]);
 
   const available = legend.available || 0;
-  const total = stalls.length || 1;
-  const occupancy = Math.round(((total - available) / total) * 100);
 
   const openStall = (s: Stall) => {
     setConfirmed(null);
@@ -82,10 +76,6 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
   };
 
   const hasCompany = !!(selected?.company_id || selected?.company_name);
-  const cellStyle = (row: number, col: number, spanCols = 1, spanRows = 1): CSSProperties => ({
-    gridColumn: `${col + 1} / span ${spanCols}`,
-    gridRow: `${row + 1} / span ${spanRows}`,
-  });
 
   const dimStall = (s: Stall) => {
     if (availableOnly && s.status !== 'available') return true;
@@ -94,30 +84,27 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
     return false;
   };
 
-  const hoverStall = hoverId ? stalls.find((s) => s.id === hoverId) : null;
-
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_minmax(300px,400px)]">
-      <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-soft">
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 bg-gradient-to-r from-white via-brand-50/30 to-grape-50/40 px-4 py-3 sm:px-5">
-          <div className="flex flex-wrap items-center gap-2">
+    <div className="grid gap-6 lg:grid-cols-[1.15fr_minmax(280px,380px)]">
+      <div className="overflow-hidden rounded-[1.75rem] border border-ink-100/80 bg-white shadow-[0_24px_60px_-28px_rgba(21,19,33,0.35)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-50 px-5 py-4">
+          <div className="flex flex-wrap items-center gap-2.5">
             <select
               value={hallId ?? ''}
               onChange={(e) => { setHallId(Number(e.target.value)); setSelected(null); }}
-              className="input w-auto rounded-full py-2 text-sm font-semibold"
+              className="input w-auto rounded-full border-ink-100 py-2 text-sm font-semibold"
             >
               {halls.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
             </select>
             <FloorViewToggle value={viewMode} onChange={setViewMode} />
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3.5 shadow-sm">
+          <div className="flex items-center gap-2 rounded-full border border-ink-100 bg-ink-50/50 px-3.5">
             <Search width={15} className="text-ink-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value.toUpperCase())}
-              placeholder="Stall or brand…"
-              className="w-36 bg-transparent py-2 text-sm outline-none sm:w-44"
+              placeholder="Find stall…"
+              className="w-32 bg-transparent py-2.5 text-sm outline-none sm:w-40"
             />
             {search && (
               <button type="button" onClick={() => setSearch('')} className="text-ink-300 hover:text-ink-600"><X width={14} /></button>
@@ -125,70 +112,36 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
           </div>
         </div>
 
-        {/* Stats + filters */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-ink-50 px-4 py-3 sm:px-5">
-          <div className="flex items-center gap-3 rounded-2xl bg-ink-50/80 px-3 py-2">
-            <div
-              className="relative grid h-11 w-11 place-items-center rounded-full"
-              style={{
-                background: `conic-gradient(#d6206e ${occupancy}%, #e5e7eb ${occupancy}%)`,
-              }}
-            >
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-white text-[10px] font-extrabold text-ink-800">
-                {occupancy}%
-              </span>
-            </div>
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-wide text-ink-400">Hall fill</div>
-              <div className="text-sm font-bold text-ink-800">
-                <span className="text-emerald-600">{available}</span>
-                <span className="text-ink-400"> / {stalls.length} free</span>
-              </div>
-            </div>
-          </div>
-
+        <div className="flex flex-wrap items-center gap-2 px-5 py-3">
           <button
             type="button"
             onClick={() => setAvailableOnly((v) => !v)}
-            className={`rounded-full px-3.5 py-2 text-xs font-bold transition-all ${
-              availableOnly
-                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                : 'border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+            className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+              availableOnly ? 'bg-emerald-500 text-white' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
             }`}
           >
-            <Zap width={12} className="inline" /> Available only
+            {available} available
           </button>
-
-          <div className="flex flex-wrap gap-1.5">
-            {(['all', 'available', 'reserved', 'booked', 'sponsor'] as StatusFilter[]).map((k) => {
-              const active = statusFilter === k;
-              const count = k === 'all' ? stalls.length : legend[k] || 0;
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setStatusFilter(k)}
-                  className={`rounded-full px-2.5 py-1.5 text-[11px] font-semibold transition-all ${
-                    active ? 'bg-ink-900 text-white' : 'bg-white text-ink-500 ring-1 ring-ink-100 hover:ring-ink-200'
-                  }`}
-                >
-                  {k === 'all' ? 'All' : stallColors[k as StallStatus].label}
-                  <span className={`ml-1 ${active ? 'text-white/60' : 'text-ink-300'}`}>{count}</span>
-                </button>
-              );
-            })}
-          </div>
+          {(['all', 'available', 'booked', 'reserved'] as StatusFilter[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setStatusFilter(k)}
+              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all ${
+                statusFilter === k ? 'bg-ink-900 text-white' : 'text-ink-500 hover:bg-ink-50'
+              }`}
+            >
+              {k === 'all' ? 'All' : stallColors[k as StallStatus].label}
+            </button>
+          ))}
         </div>
 
         {loading ? (
-          <div className="grid h-72 place-items-center">
-            <div className="flex flex-col items-center gap-3 text-ink-400">
-              <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-ink-200 border-t-brand" />
-              <span className="text-sm">Loading floor plan…</span>
-            </div>
+          <div className="grid h-80 place-items-center text-ink-400">
+            <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-ink-200 border-t-brand" />
           </div>
         ) : viewMode === '3d' ? (
-          <div className="p-3 sm:p-4">
+          <div className="px-3 pb-3 sm:px-4 sm:pb-4">
             <FloorPlan3D
               layout={layout}
               stalls={stalls}
@@ -200,301 +153,155 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
               dimUnavailable={availableOnly || statusFilter === 'available'}
               onStallClick={openStall}
             />
-            <p className="mt-2 text-center text-xs text-ink-400">Tap a booth · switch to 2D for a classic grid</p>
           </div>
         ) : (
-          <div className="floor-canvas overflow-x-auto p-4 sm:p-5">
-            <div
-              className="relative mx-auto rounded-2xl border border-ink-100/80 bg-white/70 p-4 shadow-inner backdrop-blur-sm"
-              style={{ minWidth: maxCols * (CELL + GAP) + 32 }}
-            >
-              <div className="mb-3 overflow-hidden rounded-full bg-grad py-2 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-md animate-shimmer"
-                style={{ backgroundImage: 'linear-gradient(90deg,#059669,#10b981,#34d399,#059669)', backgroundSize: '200% 100%' }}
-              >
-                {markers.entrance_label}
-              </div>
-
-              <div
-                className="relative mx-auto"
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${maxCols}, ${CELL}px)`,
-                  gridTemplateRows: `repeat(${rowsN}, ${CELL}px)`,
-                  gap: GAP,
-                  width: maxCols * CELL + (maxCols - 1) * GAP,
-                }}
-              >
-                {Array.from({ length: rowsN * maxCols }).map((_, idx) => {
-                  const row = Math.floor(idx / maxCols);
-                  const col = idx % maxCols;
-                  const inLayout = col < (layout[row] || 0);
-                  return (
-                    <div
-                      key={`${row}:${col}`}
-                      style={cellStyle(row, col)}
-                      className={inLayout ? 'rounded-xl bg-ink-50/60 ring-1 ring-ink-100/80' : ''}
-                    />
-                  );
-                })}
-
-                {markers.items.map((m) => {
-                  const meta = MARKER_META[m.kind] || MARKER_META.custom;
-                  return (
-                    <div
-                      key={m.id}
-                      style={cellStyle(m.grid_row, m.grid_col, m.span_cols || 1, m.span_rows || 1)}
-                      className={`z-[5] grid place-items-center rounded-xl border text-[10px] font-bold shadow-sm ${meta.className}`}
-                    >
-                      {m.label}
-                    </div>
-                  );
-                })}
-
-                {stalls.map((stall, i) => {
-                  const { span_cols, span_rows, display_size } = stallSpans(stall);
-                  const c = stallColors[stall.status];
-                  const isMatch = search && (stall.code.includes(search) || (stall.company_name || '').toUpperCase().includes(search));
-                  const isSel = selected?.id === stall.id;
-                  const dim = dimStall(stall);
-                  const sizeCls = display_size === 'small' ? 'text-[9px]' : 'text-[11px]';
-                  const elev =
-                    stall.status === 'available' ? 'stall-tile-available'
-                      : stall.status === 'booked' || stall.status === 'sponsor' ? 'stall-tile-booked'
-                        : '';
-                  return (
-                    <button
-                      key={stall.id}
-                      type="button"
-                      onClick={() => openStall(stall)}
-                      onMouseEnter={() => setHoverId(stall.id)}
-                      onMouseLeave={() => setHoverId(null)}
-                      title={stall.company_name ? `${stall.code} · ${stall.company_name}` : `${stall.code} · ${c.label}`}
-                      style={{
-                        ...cellStyle(stall.grid_row, stall.grid_col, span_cols, span_rows),
-                        animationDelay: `${Math.min(i, 30) * 0.025}s`,
-                        opacity: dim ? 0.28 : 1,
-                        filter: dim ? 'grayscale(0.6)' : undefined,
-                      }}
-                      className={`stall-tile z-10 grid place-items-center rounded-xl border font-bold animate-stall-in ${sizeCls} ${c.bg} ${c.border} ${c.text} ${elev} ${
-                        isSel ? 'stall-tile-selected' : ''
-                      } ${isMatch ? 'animate-glow-pulse ring-2 ring-brand-500' : ''}`}
-                    >
-                      {stall.company_logo ? (
-                        <img src={stall.company_logo} alt="" className="h-8 w-8 rounded-lg object-cover shadow-sm ring-1 ring-black/5" />
-                      ) : (
-                        <span className="leading-tight">{stall.code}</span>
-                      )}
-                      {stall.status === 'available' && (
-                        <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" />
-                      )}
-                      {stall.company_name && !stall.company_logo && (
-                        <span className="absolute bottom-0.5 max-w-[90%] truncate px-0.5 text-[7px] font-semibold opacity-60">
-                          {stall.company_name.slice(0, 8)}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="mt-3 rounded-full bg-ink-200/80 py-2 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-ink-500">
-                {markers.exit_label}
-              </div>
-
-              {/* Floating hover tip */}
-              {hoverStall && !selected && (
-                <div className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2 animate-slide-up rounded-2xl border border-ink-100 bg-ink-950/95 px-4 py-2.5 text-white shadow-xl backdrop-blur">
-                  <div className="flex items-center gap-2 text-sm font-bold">
-                    <span className={`h-2.5 w-2.5 rounded-sm ${stallColors[hoverStall.status].legend}`} />
-                    {hoverStall.code}
-                    {hoverStall.company_name && <span className="font-medium text-white/70">· {hoverStall.company_name}</span>}
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-white/50">
-                    {hoverStall.width}×{hoverStall.depth}m · {stallColors[hoverStall.status].label}
-                    {hoverStall.status === 'available' && ' · Tap to book'}
-                  </div>
-                </div>
-              )}
-            </div>
-            <p className="mt-3 text-center text-xs text-ink-400">
-              Hover for a preview · tap to open details · green glow = available
-            </p>
+          <div className="overflow-x-auto px-4 pb-6 pt-2">
+            <FloorPlan2D
+              layout={layout}
+              stalls={stalls}
+              markers={markers.items}
+              entranceLabel={markers.entrance_label}
+              exitLabel={markers.exit_label}
+              selectedId={selected?.id}
+              search={search}
+              dimStall={dimStall}
+              onStallClick={openStall}
+            />
           </div>
         )}
       </div>
 
-      {/* Side panel */}
-      <div className="sticky top-28 h-fit max-h-[calc(100vh-8rem)] overflow-y-auto rounded-3xl border border-ink-100 bg-white shadow-soft">
+      {/* Side panel — calm & clear */}
+      <div className="sticky top-28 h-fit max-h-[calc(100vh-7rem)] overflow-y-auto rounded-[1.75rem] border border-ink-100/80 bg-white shadow-[0_24px_60px_-28px_rgba(21,19,33,0.3)]">
         {!selected ? (
-          <div className="animate-fade-in px-5 py-12 text-center">
-            <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-brand-50 to-grape-100 text-brand-600 shadow-inner">
-              <Grid width={30} />
+          <div className="px-6 py-14 text-center">
+            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[#f3efe8] text-ink-500">
+              <Grid width={26} />
             </div>
-            <p className="font-display text-base font-bold text-ink-800">Pick a stall on the map</p>
-            <p className="mx-auto mt-1.5 max-w-[240px] text-xs leading-relaxed text-ink-400">
-              Tap any booth to see the exhibitor, size and — if free — book in two quick steps.
+            <p className="font-display text-lg font-bold text-ink-900">Choose a stall</p>
+            <p className="mx-auto mt-2 max-w-[200px] text-sm leading-relaxed text-ink-400">
+              Tap any booth on the {viewMode === '3d' ? '3D hall' : 'map'} to see details and book.
             </p>
-            <div className="mx-auto mt-6 grid max-w-xs grid-cols-3 gap-2 text-center">
-              {[
-                { n: available, l: 'Free', c: 'text-emerald-600 bg-emerald-50' },
-                { n: legend.booked || 0, l: 'Booked', c: 'text-brand-700 bg-brand-50' },
-                { n: legend.reserved || 0, l: 'Held', c: 'text-amber-700 bg-amber-50' },
-              ].map((s) => (
-                <div key={s.l} className={`rounded-2xl px-2 py-3 ${s.c}`}>
-                  <div className="font-display text-xl font-extrabold">{s.n}</div>
-                  <div className="text-[10px] font-semibold opacity-70">{s.l}</div>
-                </div>
-              ))}
+            <div className="mx-auto mt-8 flex max-w-[220px] justify-center gap-6 text-center">
+              <div>
+                <div className="font-display text-2xl font-extrabold text-emerald-600">{available}</div>
+                <div className="text-[11px] font-semibold text-ink-400">Free</div>
+              </div>
+              <div>
+                <div className="font-display text-2xl font-extrabold text-brand-600">{legend.booked || 0}</div>
+                <div className="text-[11px] font-semibold text-ink-400">Booked</div>
+              </div>
             </div>
           </div>
         ) : confirmed ? (
-          <div className="animate-pop p-6 text-center">
-            <div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-full bg-emerald-100 text-emerald-600 shadow-lg shadow-emerald-500/20">
-              <Check width={30} />
+          <div className="animate-pop p-8 text-center">
+            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-emerald-600">
+              <Check width={28} />
             </div>
-            <h3 className="font-display text-lg font-extrabold text-ink-900">Booking confirmed!</h3>
-            <p className="mt-1 text-sm text-ink-500">Stall <b>{selected.code}</b> at {exhibitionName} is yours.</p>
-            <div className="mt-4 rounded-2xl bg-gradient-to-br from-brand-50 to-grape-50 p-4">
+            <h3 className="font-display text-xl font-extrabold text-ink-900">You’re in</h3>
+            <p className="mt-1 text-sm text-ink-500">Stall <b>{selected.code}</b> at {exhibitionName}</p>
+            <div className="mt-5 rounded-2xl bg-ink-50 p-4">
               <div className="text-[10px] font-bold uppercase tracking-wide text-ink-400">Reference</div>
-              <div className="font-display text-xl font-extrabold text-brand-700">{confirmed.reference}</div>
+              <div className="font-display text-lg font-extrabold text-brand-700">{confirmed.reference}</div>
             </div>
-            <div className="mt-4 flex gap-2">
-              <button type="button" onClick={() => { setSelected(null); setConfirmed(null); }} className="btn-outline flex-1">Book another</button>
-              <button type="button" onClick={() => navigate('/my-bookings')} className="btn-primary flex-1">My bookings</button>
+            <div className="mt-5 flex gap-2">
+              <button type="button" onClick={() => { setSelected(null); setConfirmed(null); }} className="btn-outline flex-1">Another</button>
+              <button type="button" onClick={() => navigate('/my-bookings')} className="btn-primary flex-1">Bookings</button>
             </div>
           </div>
         ) : (
-          <div className="animate-slide-up p-5">
-            <div className="flex items-start justify-between gap-2">
+          <div className="animate-slide-up p-6">
+            <div className="flex items-start justify-between">
               <div>
-                <div className="flex items-center gap-2">
-                  <span className={`inline-block h-3 w-3 rounded-sm ${stallColors[selected.status].legend}`} />
-                  <h3 className="font-display text-lg font-extrabold text-ink-900">Stall {selected.code}</h3>
-                </div>
-                <div className="mt-0.5 text-xs text-ink-500">{selected.hall_name} · {exhibitionName}</div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-400">{stallColors[selected.status].label}</p>
+                <h3 className="font-display text-2xl font-extrabold text-ink-900">Stall {selected.code}</h3>
+                <p className="mt-0.5 text-sm text-ink-500">{selected.width}×{selected.depth}m · {selected.zone}</p>
               </div>
-              <button type="button" onClick={() => setSelected(null)} className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100">
+              <button type="button" onClick={() => setSelected(null)} className="rounded-full p-2 text-ink-300 hover:bg-ink-50 hover:text-ink-600">
                 <X width={18} />
               </button>
             </div>
 
-            {/* Quick specs strip */}
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              {[
-                { l: 'Size', v: `${selected.width}×${selected.depth}m` },
-                { l: 'Area', v: `${selected.area} m²` },
-                { l: 'Zone', v: selected.zone || '—' },
-              ].map((x) => (
-                <div key={x.l} className="rounded-xl bg-ink-50 px-2 py-2.5 text-center">
-                  <div className="text-[9px] font-bold uppercase tracking-wide text-ink-400">{x.l}</div>
-                  <div className="truncate text-xs font-bold text-ink-800">{x.v}</div>
-                </div>
-              ))}
-            </div>
-
             {hasCompany ? (
-              <div className="mt-4 overflow-hidden rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50/80 to-white">
+              <div className="mt-5 overflow-hidden rounded-2xl bg-[#faf8f5]">
                 <div className="flex items-center gap-3 p-4">
-                  <img src={selected.company_logo} alt="" className="h-14 w-14 rounded-2xl object-cover shadow-sm" />
+                  <img src={selected.company_logo} alt="" className="h-12 w-12 rounded-2xl object-cover" />
                   <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-brand-600">Exhibiting company</div>
-                    <div className="truncate font-display text-base font-extrabold text-ink-900">{selected.company_name}</div>
+                    <div className="truncate font-display font-bold text-ink-900">{selected.company_name}</div>
                     {selected.company_industry && <div className="truncate text-xs text-ink-500">{selected.company_industry}</div>}
                   </div>
                 </div>
-                {selected.company_about && (
-                  <p className="border-t border-brand-100/60 px-4 py-3 text-sm leading-relaxed text-ink-600 line-clamp-3">{selected.company_about}</p>
-                )}
-                <div className="space-y-2 border-t border-brand-100/60 px-4 py-3 text-sm text-ink-600">
-                  {selected.company_contact && <div className="flex items-center gap-2"><Building width={14} className="text-ink-400" /> {selected.company_contact}</div>}
-                  {selected.company_email && <div className="flex items-center gap-2"><Mail width={14} className="text-ink-400" /> {selected.company_email}</div>}
-                  {selected.company_phone && <div className="flex items-center gap-2"><Phone width={14} className="text-ink-400" /> {selected.company_phone}</div>}
-                  {selected.company_website && <div className="flex items-center gap-2"><Globe width={14} className="text-ink-400" /> {selected.company_website}</div>}
-                </div>
                 {selected.company_id && (
-                  <div className="border-t border-brand-100/60 p-3">
+                  <div className="border-t border-ink-100/80 p-3">
                     <Link to={`/company/${selected.company_id}`} className="btn-primary w-full text-sm">
-                      View company profile <ArrowRight width={15} />
+                      Company profile <ArrowRight width={14} />
                     </Link>
                   </div>
                 )}
-                {toEmbedUrl(selected.company_youtube || selected.youtube_url) && (
-                  <div className="border-t border-brand-100/60 p-3">
-                    <div className="aspect-video overflow-hidden rounded-xl bg-ink-950">
-                      <iframe title="Company video" src={toEmbedUrl(selected.company_youtube || selected.youtube_url)!} className="h-full w-full border-0" allowFullScreen />
-                    </div>
-                  </div>
-                )}
               </div>
-            ) : (
-              <div className="mt-4 rounded-2xl border border-dashed border-ink-200 bg-ink-50 px-4 py-5 text-center">
-                <Building width={22} className="mx-auto text-ink-300" />
-                <p className="mt-2 text-sm font-medium text-ink-600">
-                  {selected.status === 'available' ? 'Open for your brand' : stallColors[selected.status].label}
-                </p>
+            ) : selected.status === 'available' ? (
+              <div className="mt-5 rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 px-4 py-4 text-center text-sm text-emerald-800">
+                This stall is open for your brand
               </div>
-            )}
+            ) : null}
 
-            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
               <Info label="Type" value={selected.type} />
-              <Info label="Status" value={<span className={`${stallColors[selected.status].text} font-semibold`}>{stallColors[selected.status].label}</span>} />
-              {isAdmin && <Info label="Price" value={<span className="font-bold text-ink-900">{formatINR(selected.price)}</span>} />}
-            </dl>
+              <Info label="Area" value={`${selected.area} m²`} />
+              {isAdmin && <Info label="Price" value={<span className="font-bold">{formatINR(selected.price)}</span>} />}
+            </div>
 
-            {selected.description && <p className="mt-3 text-sm leading-relaxed text-ink-600">{selected.description}</p>}
+            {selected.description && <p className="mt-4 text-sm leading-relaxed text-ink-600">{selected.description}</p>}
 
             {selected.facilities && selected.facilities.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
+              <div className="mt-4 flex flex-wrap gap-1.5">
                 {selected.facilities.map((f) => (
-                  <span key={f} className="rounded-full bg-ink-100 px-2.5 py-1 text-[11px] font-medium text-ink-700">{f}</span>
+                  <span key={f} className="rounded-full bg-ink-50 px-2.5 py-1 text-[11px] font-medium text-ink-600">{f}</span>
                 ))}
               </div>
             )}
 
-            {(selected.brochure_url || (selected.documents && selected.documents.length > 0)) && (
+            {(selected.brochure_url || selected.documents?.length) && (
               <div className="mt-4 space-y-2">
                 {selected.brochure_url && (
-                  <a href={selected.brochure_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 text-sm text-ink-700 hover:bg-ink-50">
-                    <Download width={16} className="text-brand-600" /> Stall Brochure.pdf
+                  <a href={selected.brochure_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-ink-100 px-3 py-2.5 text-sm hover:bg-ink-50">
+                    <Download width={15} className="text-brand" /> Brochure
                   </a>
                 )}
                 {selected.documents?.map((d) => (
-                  <a key={d.name} href={d.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2.5 text-sm text-ink-700 hover:bg-ink-50">
-                    <Download width={16} className="text-brand-600" /> {d.name}
+                  <a key={d.name} href={d.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-ink-100 px-3 py-2.5 text-sm hover:bg-ink-50">
+                    <Download width={15} className="text-brand" /> {d.name}
                   </a>
                 ))}
               </div>
             )}
 
-            {/* Booking — 2-step */}
-            {canBook && selected.status === 'available' && (
-              <div className="mt-5 border-t border-ink-100 pt-4">
-                <div className="mb-3 flex items-center gap-2">
-                  {[1, 2].map((s) => (
-                    <div key={s} className="flex flex-1 items-center gap-2">
-                      <span className={`grid h-6 w-6 place-items-center rounded-full text-[10px] font-bold ${
-                        bookStep >= s ? 'bg-brand text-white' : 'bg-ink-100 text-ink-400'
-                      }`}>{s}</span>
-                      <span className={`text-[11px] font-semibold ${bookStep >= s ? 'text-ink-800' : 'text-ink-400'}`}>
-                        {s === 1 ? 'Review' : 'Details'}
-                      </span>
-                      {s === 1 && <span className="h-px flex-1 bg-ink-100" />}
-                    </div>
-                  ))}
-                </div>
+            {selected.company_contact || selected.company_email || selected.company_phone ? (
+              <div className="mt-4 space-y-2 text-sm text-ink-600">
+                {selected.company_contact && <div className="flex items-center gap-2"><Building width={14} className="text-ink-300" />{selected.company_contact}</div>}
+                {selected.company_email && <div className="flex items-center gap-2"><Mail width={14} className="text-ink-300" />{selected.company_email}</div>}
+                {selected.company_phone && <div className="flex items-center gap-2"><Phone width={14} className="text-ink-300" />{selected.company_phone}</div>}
+                {selected.company_website && <div className="flex items-center gap-2"><Globe width={14} className="text-ink-300" />{selected.company_website}</div>}
+              </div>
+            ) : null}
 
+            {toEmbedUrl(selected.company_youtube || selected.youtube_url) && (
+              <div className="mt-4 aspect-video overflow-hidden rounded-2xl bg-ink-950">
+                <iframe title="Video" src={toEmbedUrl(selected.company_youtube || selected.youtube_url)!} className="h-full w-full border-0" allowFullScreen />
+              </div>
+            )}
+
+            {canBook && selected.status === 'available' && (
+              <div className="mt-6 border-t border-ink-50 pt-5">
                 {bookStep === 1 ? (
-                  <div className="animate-fade-in space-y-3">
-                    <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-brand-50 p-4">
-                      <div className="text-xs font-bold uppercase tracking-wide text-emerald-700">Ready to reserve</div>
-                      <div className="mt-1 font-display text-lg font-extrabold text-ink-900">{selected.code}</div>
-                      <div className="mt-1 text-sm text-ink-600">{selected.width}×{selected.depth}m · {selected.zone}</div>
-                      {isAdmin && (
-                        <div className="mt-2 font-display text-xl font-extrabold text-brand-700">{formatINR(selected.price)}</div>
-                      )}
+                  <div className="space-y-3">
+                    <div className="rounded-2xl bg-grad p-4 text-white">
+                      <div className="text-[10px] font-bold uppercase tracking-wide text-white/70">Reserve</div>
+                      <div className="font-display text-xl font-extrabold">{selected.code}</div>
+                      <div className="mt-1 text-sm text-white/80">{formatINR(selected.price)}</div>
                     </div>
                     <button type="button" onClick={() => setBookStep(2)} className="btn-primary w-full">
-                      Continue to book <ArrowRight width={15} />
+                      Continue <ArrowRight width={15} />
                     </button>
                   </div>
                 ) : (
@@ -506,13 +313,10 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
                     <select className="input" value={form.payment_mode} onChange={(e) => setForm({ ...form, payment_mode: e.target.value })}>
                       <option>UPI</option><option>Credit Card</option><option>Bank Transfer</option>
                     </select>
-                    <div className="rounded-2xl bg-brand-50 p-3.5 text-sm font-medium text-brand-800">
-                      {isAdmin ? <>Total {formatINR(selected.price)}</> : 'Organizer will confirm pricing after submit'}
-                    </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 pt-1">
                       <button type="button" onClick={() => setBookStep(1)} className="btn-outline flex-1">Back</button>
-                      <button type="button" onClick={submitBooking} disabled={booking} className="btn-primary flex-[1.4]">
-                        {booking ? 'Booking…' : 'Confirm booking'}
+                      <button type="button" onClick={submitBooking} disabled={booking} className="btn-primary flex-[1.3]">
+                        {booking ? '…' : 'Confirm'}
                       </button>
                     </div>
                   </div>
@@ -521,12 +325,9 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
             )}
 
             {!canBook && selected.status === 'available' && (
-              <div className="mt-5 rounded-2xl border border-dashed border-brand-200 bg-brand-50/50 p-4 text-center text-sm text-ink-600">
-                Want this stall?
-                <button type="button" onClick={() => navigate('/login')} className="mt-2 block w-full font-bold text-brand-700 underline">
-                  Login as exhibitor to book
-                </button>
-              </div>
+              <button type="button" onClick={() => navigate('/login')} className="btn-primary mt-6 w-full">
+                Login to book
+              </button>
             )}
           </div>
         )}
@@ -537,9 +338,9 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
 
 function Info({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div>
-      <dt className="text-[11px] uppercase tracking-wide text-ink-400">{label}</dt>
-      <dd className="text-ink-700">{value}</dd>
+    <div className="rounded-2xl bg-ink-50/80 px-3 py-2.5">
+      <dt className="text-[10px] font-bold uppercase tracking-wide text-ink-400">{label}</dt>
+      <dd className="mt-0.5 font-semibold text-ink-800">{value}</dd>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -15,17 +15,25 @@ import AdminDiscoverEvents from './pages/AdminDiscoverEvents';
 import CompanyProfile from './pages/CompanyProfile';
 import CompanyDashboard from './pages/CompanyDashboard';
 import Marketing from './pages/Marketing';
+import Flyers from './pages/Flyers';
 import NotFound from './pages/NotFound';
 
+const HIDE_CHROME = new Set(['/marketing', '/marketting', '/product', '/flyers']);
+
 export default function App() {
+  const { pathname } = useLocation();
+  const bare = HIDE_CHROME.has(pathname);
+
   return (
     <div className="flex min-h-screen flex-col">
-      <Navbar />
+      {!bare && <Navbar />}
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/product" element={<Marketing />} />
           <Route path="/marketing" element={<Marketing />} />
+          <Route path="/marketting" element={<Marketing />} />
+          <Route path="/flyers" element={<Flyers />} />
           <Route path="/exhibitions" element={<Exhibitions />} />
           <Route path="/exhibitions/:slug" element={<ExhibitionDetail />} />
           <Route path="/company/:id" element={<CompanyProfile />} />
@@ -41,7 +49,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-      <Footer />
+      {!bare && <Footer />}
     </div>
   );
 }

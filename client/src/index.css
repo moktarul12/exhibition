@@ -207,5 +207,38 @@ h1, h2, h3, h4, .font-display {
   50% { opacity: 1; }
 }
 
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.animate-walk-a { animation: walkA 9s linear infinite; }
+@keyframes walkA {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(28px, 10px); }
+  50% { transform: translate(12px, 36px); }
+  75% { transform: translate(-18px, 18px); }
+  100% { transform: translate(0, 0); }
+}
+.animate-walk-b { animation: walkB 11s linear infinite; }
+@keyframes walkB {
+  0% { transform: translate(0, 0); }
+  30% { transform: translate(-22px, 24px); }
+  60% { transform: translate(20px, 40px); }
+  100% { transform: translate(0, 0); }
+}
+.animate-walk-c { animation: walkC 8s ease-in-out infinite; }
+@keyframes walkC {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(40px, -8px); }
+}
+.animate-bob { animation: bob 1.2s ease-in-out infinite; }
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.animate-hall-breathe { animation: hallBreathe 6s ease-in-out infinite; }
+@keyframes hallBreathe {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.06); }
+}
+.animate-spot { animation: spotPulse 3.5s ease-in-out infinite; }
+@keyframes spotPulse {
+  0%, 100% { opacity: .35; }
+  50% { opacity: .7; }
+}
