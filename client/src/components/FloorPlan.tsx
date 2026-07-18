@@ -175,8 +175,8 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
         )}
       </div>
 
-      {/* Side panel — calm & clear */}
-      <div className="sticky top-28 h-fit max-h-[calc(100vh-7rem)] overflow-y-auto rounded-[1.75rem] border border-ink-100/80 bg-white shadow-[0_24px_60px_-28px_rgba(21,19,33,0.3)]">
+      {/* Side panel — full content, no inner scroll */}
+      <div className="h-fit rounded-[1.75rem] border border-ink-100/80 bg-white shadow-[0_24px_60px_-28px_rgba(21,19,33,0.3)]">
         {!selected ? (
           <div className="px-6 py-14 text-center">
             <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[#f3efe8] text-ink-500">

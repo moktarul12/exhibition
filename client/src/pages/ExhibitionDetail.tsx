@@ -20,17 +20,9 @@ type Detail = Exhibition & {
   documents?: MediaDoc[];
 };
 
-const SECTIONS = [
-  { id: 'about', label: 'About' },
-  { id: 'floor', label: 'Floor plan' },
-  { id: 'exhibitors', label: 'Top exhibitors' },
-  { id: 'docs', label: 'Documents' },
-  { id: 'reels', label: 'Reels' },
-  { id: 'videos', label: 'Videos' },
-  { id: 'gallery', label: 'Photos' },
-  { id: 'comments', label: 'Reviews' },
-  { id: 'schedule', label: 'Schedule' },
-] as const;
+type SectionId = 'overview' | 'floor' | 'exhibitors' | 'media' | 'reviews' | 'schedule';
+
+const SECTION_IDS: SectionId[] = ['overview', 'floor', 'exhibitors', 'media', 'reviews', 'schedule'];
 
 function mapsOpenUrl(lat?: number, lng?: number, query?: string) {
   if (lat != null && lng != null) return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
@@ -54,9 +46,9 @@ export default function ExhibitionDetail() {
   const [fav, setFav] = useState(false);
   const [following, setFollowing] = useState(false);
   const [shareOk, setShareOk] = useState(false);
-  const [activeSection, setActiveSection] = useState('about');
+  const [activeSection, setActiveSection] = useState<SectionId>('overview');
   const [floorView, setFloorView] = useState<'map' | 'book'>('map');
-  const floorRef = useRef<HTMLElement | null>(null);
+  const navRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -74,21 +66,6 @@ export default function ExhibitionDetail() {
     api.get(`/exhibitions/${slug}/media`).then((r) => setMedia(r.data)).catch(() => setMedia([]));
   }, [slug]);
 
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible?.target?.id) setActiveSection(visible.target.id);
-      },
-      { rootMargin: '-20% 0px -55% 0px', threshold: [0.1, 0.35] },
-    );
-    SECTIONS.forEach((s) => {
-      const el = document.getElementById(s.id);
-      if (el) obs.observe(el);
-    });
-    return () => obs.disconnect();
-  }, [data]);
-
   const avgRating = useMemo(() => {
     if (!comments.length) return 0;
     return Math.round((comments.reduce((n, c) => n + (c.rating || 0), 0) / comments.length) * 10) / 10;
@@ -97,7 +74,6 @@ export default function ExhibitionDetail() {
   const reels = useMemo(() => media.filter((m) => m.kind === 'reel' || mediaKind(m.url) === 'instagram'), [media]);
   const videos = useMemo(() => media.filter((m) => m.kind === 'video' || (m.kind !== 'photo' && m.kind !== 'reel' && mediaKind(m.url) === 'youtube')), [media]);
   const photos = useMemo(() => media.filter((m) => m.kind === 'photo'), [media]);
-  const topExhibitors = useMemo(() => (data?.exhibitors || []).slice(0, 8), [data]);
 
   const onMediaAdded = (item: ExhibitionMedia) => {
     setMedia((prev) => [item, ...prev]);
@@ -123,7 +99,23 @@ export default function ExhibitionDetail() {
       else { await navigator.clipboard.writeText(url); setShareOk(true); setTimeout(() => setShareOk(false), 2000); }
     } catch { /* ignore */ }
   };
-  const scrollTo = (id: string) => {
+
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible?.target?.id) setActiveSection(visible.target.id as SectionId);
+      },
+      { rootMargin: '-25% 0px -55% 0px', threshold: [0.05, 0.25] },
+    );
+    SECTION_IDS.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) obs.observe(el);
+    });
+    return () => obs.disconnect();
+  }, [data]);
+
+  const goSection = (id: SectionId) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
@@ -136,98 +128,140 @@ export default function ExhibitionDetail() {
   const mapLink = mapsOpenUrl(data.lat, data.lng, placeQuery);
   const docs = data.documents?.length ? data.documents : [];
   const allPhotos = [...(data.gallery || []), ...photos.map((p) => p.url)].filter((v, i, a) => a.indexOf(v) === i);
+  const mediaCount = reels.length + videos.length + allPhotos.length + (data.reel_url ? 1 : 0) + (data.youtube_url ? 1 : 0);
+
+  const NAV: { id: SectionId; label: string; count?: number }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'floor', label: 'Floor plan' },
+    { id: 'exhibitors', label: 'Exhibitors', count: data.exhibitors.length },
+    { id: 'media', label: 'Media', count: mediaCount },
+    { id: 'reviews', label: 'Reviews', count: comments.length },
+    { id: 'schedule', label: 'Schedule', count: data.seminars.length },
+  ];
 
   return (
     <div className="pb-16">
-      {/* Immersive hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0">
+      {/* ---- Compact cinematic hero ---- */}
+      <section className="relative">
+        <div className="absolute inset-0 overflow-hidden">
           <img src={data.banner} alt="" className="h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/70 to-ink-950/30" />
+          <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/60 to-ink-950/25" />
         </div>
-        <div className="container-px relative pb-10 pt-8 lg:pb-14 lg:pt-12">
-          <Link to="/exhibitions" className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-white/75 hover:text-white">
-            <ArrowRight width={16} className="rotate-180" /> All exhibitions
-          </Link>
-          <div className="max-w-3xl">
+        <div className="container-px relative pb-20 pt-8 lg:pb-24 lg:pt-10">
+          <div className="flex items-center justify-between">
+            <Link to="/exhibitions" className="inline-flex items-center gap-1.5 text-sm font-medium text-white/75 hover:text-white">
+              <ArrowRight width={16} className="rotate-180" /> All exhibitions
+            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleFav}
+                aria-label="Save"
+                className={`grid h-10 w-10 place-items-center rounded-full backdrop-blur transition ${fav ? 'bg-brand text-white' : 'bg-white/15 text-white hover:bg-white/25'}`}
+              >
+                <Heart width={17} style={fav ? { fill: 'currentColor' } : undefined} />
+              </button>
+              <button
+                onClick={shareEvent}
+                aria-label="Share"
+                className="grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white backdrop-blur hover:bg-white/25"
+              >
+                {shareOk ? <Check width={17} /> : <ShareIcon />}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-10 max-w-3xl lg:mt-14">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <StatusBadge status={data.status} />
-              {data.tags.slice(0, 3).map((t) => (
-                <span key={t} className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">{t}</span>
-              ))}
+              {day && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 px-3 py-1 text-[11px] font-bold text-emerald-200">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" /> Day {day.current} of {day.total}
+                </span>
+              )}
+              {startsIn != null && startsIn >= 0 && (
+                <span className="rounded-full bg-amber-400/20 px-3 py-1 text-[11px] font-bold text-amber-200">Starts in {startsIn} days</span>
+              )}
               {avgRating > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2.5 py-1 text-[11px] font-bold text-amber-200">
-                  <Star width={12} style={{ fill: '#fbbf24', color: '#fbbf24' }} /> {avgRating} · {comments.length} reviews
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white">
+                  <Star width={12} style={{ fill: '#fbbf24', color: '#fbbf24' }} /> {avgRating}
                 </span>
               )}
             </div>
-            <h1 className="font-display text-3xl font-extrabold leading-tight text-white sm:text-5xl lg:text-[3.4rem]">{data.name}</h1>
+            <h1 className="font-display text-3xl font-extrabold leading-tight text-white sm:text-5xl">{data.name}</h1>
             <p className="mt-3 max-w-2xl text-base text-white/80 sm:text-lg">{data.tagline}</p>
-            <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/85">
-              <span className="flex items-center gap-1.5"><MapPin width={16} className="text-brand-300" /> {data.venue}, {data.city}</span>
-              <span className="flex items-center gap-1.5"><Calendar width={16} className="text-brand-300" /> {formatDate(data.start_date)} – {formatDate(data.end_date)}</span>
-              {day && <span className="flex items-center gap-1.5 font-semibold text-amber-300"><Clock width={16} /> Day {day.current} of {day.total}</span>}
-              {startsIn != null && startsIn >= 0 && <span className="flex items-center gap-1.5 font-semibold text-amber-300"><Clock width={16} /> Starts in {startsIn} days</span>}
+            <div className="mt-6 flex flex-wrap items-center gap-2.5">
+              <button onClick={() => goSection('floor')} className="btn-primary px-5 py-2.5">
+                <Grid width={16} /> {canBook && data.status !== 'past' ? 'Explore & book stalls' : 'Explore floor plan'}
+              </button>
+              {data.organizer && (
+                <button
+                  onClick={toggleFollow}
+                  className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold backdrop-blur transition ${following ? 'bg-emerald-500 text-white' : 'bg-white/15 text-white hover:bg-white/25'}`}
+                >
+                  {following ? <><Check width={15} /> Following</> : <>Follow {data.organizer.name.split(' ')[0]}</>}
+                </button>
+              )}
             </div>
-          </div>
-
-          {/* Actions: favourite / share / follow — no stall price for visitors */}
-          <div className="mt-8 flex flex-wrap items-center gap-2.5">
-            <button onClick={() => scrollTo('floor')} className="btn-primary px-5 py-2.5">
-              <Grid width={16} /> Explore floor plan
-            </button>
-            {canBook && data.status !== 'past' && (
-              <button onClick={() => scrollTo('floor')} className="btn border-2 border-white/40 bg-white/10 px-5 py-2.5 text-white hover:bg-white/20">
-                {isAdmin ? `Book stall · from ${formatINR(data.price_from)}` : 'Book a stall'}
-              </button>
-            )}
-            <button onClick={toggleFav} className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold backdrop-blur transition ${fav ? 'bg-brand text-white' : 'bg-white/15 text-white hover:bg-white/25'}`}>
-              <Heart width={16} style={fav ? { fill: 'currentColor' } : undefined} /> {fav ? 'Saved' : 'Favourite'}
-            </button>
-            <button onClick={shareEvent} className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur hover:bg-white/25">
-              <ShareIcon /> {shareOk ? 'Link copied' : 'Share'}
-            </button>
-            {data.organizer && (
-              <button onClick={toggleFollow} className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold backdrop-blur ${following ? 'bg-emerald-500 text-white' : 'bg-white/15 text-white hover:bg-white/25'}`}>
-                {following ? <><Check width={15} /> Following organizer</> : <>Follow {data.organizer.name.split(' ')[0]}</>}
-              </button>
-            )}
-          </div>
-
-          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <HeroStat label="Exhibitors" value={data.exhibitors.length || data.companies || '—'} />
-            <HeroStat label="Stalls" value={data.total_stalls ?? '—'} />
-            <HeroStat label={data.status === 'live' ? 'Visitors today' : 'Total visitors'} value={(data.status === 'live' ? data.visitors_today : data.total_visitors).toLocaleString('en-IN')} />
-            <HeroStat label="Halls" value={data.halls.length} />
           </div>
         </div>
       </section>
 
-      {/* Sticky section nav */}
-      <div className="sticky top-16 z-30 border-b border-ink-100 bg-[var(--paper)]/95 backdrop-blur">
+      {/* ---- Ticket strip: key facts in one band, overlapping the hero ---- */}
+      <div className="container-px relative z-10 -mt-12">
+        <div className="grid grid-cols-2 overflow-hidden rounded-[1.5rem] border border-ink-100 bg-white shadow-[0_24px_60px_-28px_rgba(21,19,33,0.35)] lg:grid-cols-[1.2fr_1.4fr_1fr_1.4fr]">
+          <TicketCell icon={<Calendar width={18} />} label="Dates">
+            <span className="font-semibold text-ink-900">{formatDate(data.start_date)} – {formatDate(data.end_date)}</span>
+          </TicketCell>
+          <TicketCell icon={<MapPin width={18} />} label="Venue">
+            <span className="truncate font-semibold text-ink-900">{data.venue}, {data.city}</span>
+            <a href={mapLink} target="_blank" rel="noreferrer" className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700">
+              Get directions <ArrowRight width={11} />
+            </a>
+          </TicketCell>
+          <TicketCell icon={<Ticket width={18} />} label="Entry">
+            <span className="font-semibold text-ink-900">{data.entry_free ? 'Free' : 'Paid pass'}</span>
+            <span className="text-xs text-ink-400">{data.entry_free ? 'Register online' : 'Buy at venue / online'}</span>
+          </TicketCell>
+          <div className="col-span-2 flex items-center justify-around gap-2 border-t border-dashed border-ink-200 px-5 py-4 lg:col-span-1 lg:border-l lg:border-t-0">
+            <TicketStat value={data.exhibitors.length || data.companies || '—'} label="Exhibitors" />
+            <TicketStat value={data.total_stalls ?? '—'} label="Stalls" />
+            <TicketStat
+              value={(data.status === 'live' ? data.visitors_today : data.total_visitors).toLocaleString('en-IN')}
+              label={data.status === 'live' ? 'Today' : 'Visitors'}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ---- Scroll-spy section nav ---- */}
+      <div ref={navRef} className="sticky top-16 z-30 mt-8 border-b border-ink-100 bg-[var(--paper)]/95 backdrop-blur">
         <div className="container-px">
-          <div className="no-scrollbar flex gap-1 overflow-x-auto">
-            {SECTIONS.map((s) => (
+          <div className="no-scrollbar -mb-px flex gap-1 overflow-x-auto">
+            {NAV.map((t) => (
               <button
-                key={s.id}
-                onClick={() => scrollTo(s.id)}
-                className={`relative whitespace-nowrap px-3.5 py-3.5 text-sm font-semibold transition-colors ${activeSection === s.id ? 'text-brand-700' : 'text-ink-500 hover:text-ink-900'}`}
+                key={t.id}
+                onClick={() => goSection(t.id)}
+                className={`relative flex items-center gap-1.5 whitespace-nowrap px-3.5 py-3.5 text-sm font-semibold transition-colors ${activeSection === t.id ? 'text-brand-700' : 'text-ink-500 hover:text-ink-900'}`}
               >
-                {s.label}
-                {activeSection === s.id && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-full bg-brand" />}
+                {t.label}
+                {t.count != null && t.count > 0 && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${activeSection === t.id ? 'bg-brand-100 text-brand-700' : 'bg-ink-100 text-ink-500'}`}>{t.count}</span>
+                )}
+                {activeSection === t.id && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-full bg-brand" />}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="container-px mt-10 space-y-16 lg:space-y-20">
-        {/* About */}
-        <section id="about" className="scroll-mt-36">
-          <SectionTitle title="About this exhibition" subtitle="Everything you need to know before you visit." />
-          <div className="mt-6 grid gap-8 lg:grid-cols-[1.6fr_1fr]">
+      {/* ---- All sections, stacked ---- */}
+      <div className="mt-2">
+        {/* 01 · Overview: about left, organizer vertical card right */}
+        <section id="overview" className="container-px scroll-mt-32 py-12">
+          <div className="grid gap-10 lg:grid-cols-[1.7fr_1fr]">
             <div>
-              <p className="text-base leading-relaxed text-ink-600 sm:text-[17px]">{data.about}</p>
+              <SectionTitle eyebrow="01 · Know the event" title="About this exhibition" />
+              <p className="mt-5 text-base leading-relaxed text-ink-600 sm:text-[17px]">{data.about}</p>
               <div className="mt-5 flex flex-wrap gap-2">
                 <Chip>{data.industry}</Chip>
                 <Chip>{data.city}</Chip>
@@ -236,6 +270,7 @@ export default function ExhibitionDetail() {
                 {!!data.government && <Chip>Government</Chip>}
                 {!!data.entry_free && <Chip>Free entry</Chip>}
               </div>
+
               <div className="mt-8 grid gap-3 sm:grid-cols-2">
                 {[
                   { icon: Building, t: 'Live product demos', d: 'See launches and machinery in action across halls.' },
@@ -243,59 +278,76 @@ export default function ExhibitionDetail() {
                   { icon: Ticket, t: 'Seminars & talks', d: 'Expert sessions scheduled throughout the show days.' },
                   { icon: Grid, t: '2D & 3D floor plan', d: 'Toggle views, filter available stalls, book in two steps.' },
                 ].map((f) => (
-                  <div key={f.t} className="flex gap-3 rounded-2xl border border-ink-100 bg-white p-4">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600"><f.icon width={18} /></span>
-                    <div><div className="font-semibold text-ink-900">{f.t}</div><div className="text-sm text-ink-500">{f.d}</div></div>
+                  <div key={f.t} className="flex gap-3.5 rounded-2xl border border-ink-100 bg-white p-4">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600"><f.icon width={19} /></span>
+                    <div>
+                      <div className="font-semibold text-ink-900">{f.t}</div>
+                      <div className="mt-0.5 text-sm text-ink-500">{f.d}</div>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-            <aside className="space-y-4">
-              <div className="rounded-3xl border border-ink-100 bg-white p-5 shadow-card">
-                <h3 className="mb-4 text-xs font-bold uppercase tracking-wide text-ink-400">Event snapshot</h3>
-                <dl className="space-y-3.5 text-sm">
-                  <Row icon={<Calendar width={16} />} label="Dates" value={`${formatDate(data.start_date)} – ${formatDate(data.end_date)}`} />
-                  <Row icon={<MapPin width={16} />} label="Venue" value={`${data.venue}, ${data.city}`} />
-                  <Row icon={<Ticket width={16} />} label="Visitor entry" value={data.entry_free ? 'Free (register online)' : 'Paid visitor pass'} />
-                  <Row icon={<Users width={16} />} label="Exhibitors" value={`${data.exhibitors.length} listed`} />
-                </dl>
-                {data.address && (
-                  <p className="mt-3 text-xs leading-relaxed text-ink-500">{data.address}</p>
-                )}
-                <a
-                  href={mapLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-200 bg-brand-soft px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-100"
-                >
-                  <MapPin width={15} /> Open in Google Maps
-                </a>
-                {isAdmin && data.status !== 'past' && (
-                  <div className="mt-5 rounded-2xl bg-ink-50 p-3.5">
-                    <div className="text-[11px] uppercase tracking-wide text-ink-400">Exhibitor pricing · admin</div>
-                    <div className="font-display text-2xl font-extrabold text-ink-900">{formatINR(data.price_from)} <span className="text-sm font-medium text-ink-400">/ stall from</span></div>
-                  </div>
-                )}
+
+              {/* Documents inline under about */}
+              <div className="mt-8">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-ink-400">Event documents</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {docs.length === 0 ? (
+                    <div className="col-span-full rounded-2xl border border-dashed border-ink-200 bg-ink-50 py-8 text-center text-sm text-ink-500">Documents coming soon.</div>
+                  ) : docs.map((d) => (
+                    <a
+                      key={d.name}
+                      href={d.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-3.5 rounded-2xl border border-ink-100 bg-white p-3.5 transition-shadow hover:shadow-soft"
+                    >
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">
+                        <Download width={17} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-ink-900">{d.name}</div>
+                        <div className="text-[10px] uppercase text-ink-400">{d.type || 'PDF'} file</div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
               </div>
-              {data.organizer && (
-                <div className="rounded-3xl border border-ink-100 bg-white p-5 shadow-card">
-                  <h3 className="mb-4 text-xs font-bold uppercase tracking-wide text-ink-400">Organizer</h3>
-                  <div className="flex items-center gap-3">
-                    <img src={data.organizer.logo} alt="" className="h-12 w-12 rounded-xl" />
-                    <div>
-                      <div className="font-semibold text-ink-900">{data.organizer.name}</div>
-                      <button onClick={toggleFollow} className="text-xs font-semibold text-brand-600">{following ? 'Following ✓' : '+ Follow'}</button>
+
+              {data.address && (
+                <p className="mt-6 text-sm text-ink-400"><MapPin width={13} className="mr-1 inline" />{data.address}</p>
+              )}
+              {isAdmin && data.status !== 'past' && (
+                <div className="mt-4 inline-flex items-center gap-3 rounded-2xl bg-ink-50 px-4 py-3">
+                  <span className="text-[11px] uppercase tracking-wide text-ink-400">Exhibitor pricing · admin</span>
+                  <span className="font-display text-xl font-extrabold text-ink-900">{formatINR(data.price_from)} <span className="text-sm font-medium text-ink-400">/ stall from</span></span>
+                </div>
+              )}
+            </div>
+
+            {/* Organizer — vertical card on the right */}
+            {data.organizer && (
+              <aside>
+                <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-card">
+                  <div className="relative h-20 bg-grad">
+                    <span className="absolute left-5 top-4 text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">Organized by</span>
+                    <img src={data.organizer.logo} alt="" className="absolute -bottom-7 left-5 h-16 w-16 rounded-2xl border-4 border-white bg-white shadow-md" />
+                  </div>
+                  <div className="px-5 pb-6 pt-10">
+                    <div className="font-display text-lg font-bold text-ink-900">{data.organizer.name}</div>
+                    <p className="mt-2.5 text-sm leading-relaxed text-ink-500">{data.organizer.about}</p>
+                    <button
+                      onClick={toggleFollow}
+                      className={`mt-4 w-full rounded-full px-4 py-2.5 text-sm font-semibold transition ${following ? 'bg-emerald-50 text-emerald-700' : 'bg-brand text-white hover:bg-brand-600'}`}
+                    >
+                      {following ? '✓ Following' : '+ Follow organizer'}
+                    </button>
+                    <div className="mt-5 space-y-2.5 border-t border-ink-50 pt-4 text-sm text-ink-600">
+                      <div className="flex items-center gap-2.5"><Globe width={15} className="shrink-0 text-ink-400" /> <span className="truncate">{data.organizer.website}</span></div>
+                      <div className="flex items-center gap-2.5"><Mail width={15} className="shrink-0 text-ink-400" /> <span className="truncate">{data.organizer.email}</span></div>
+                      <div className="flex items-center gap-2.5"><Phone width={15} className="shrink-0 text-ink-400" /> {data.organizer.phone}</div>
                     </div>
-                  </div>
-                  <p className="mt-3 text-sm text-ink-500">{data.organizer.about}</p>
-                  <div className="mt-4 space-y-2 text-sm text-ink-600">
-                    <div className="flex items-center gap-2"><Globe width={15} className="text-ink-400" /> {data.organizer.website}</div>
-                    <div className="flex items-center gap-2"><Mail width={15} className="text-ink-400" /> {data.organizer.email}</div>
-                    <div className="flex items-center gap-2"><Phone width={15} className="text-ink-400" /> {data.organizer.phone}</div>
-                  </div>
-                  <div className="mt-4">
-                    <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-ink-400">Follow us</div>
-                    <div className="flex gap-2">
+                    <div className="mt-4 flex gap-2 border-t border-ink-50 pt-4">
                       <SocialBtn href="#" label="Instagram"><Instagram /></SocialBtn>
                       <SocialBtn href="#" label="YouTube"><Youtube /></SocialBtn>
                       <SocialBtn href="#" label="LinkedIn"><Linkedin /></SocialBtn>
@@ -304,176 +356,146 @@ export default function ExhibitionDetail() {
                     </div>
                   </div>
                 </div>
-              )}
-            </aside>
-          </div>
-        </section>
-
-        {/* Floor plan — attached map and/or interactive booking */}
-        <section id="floor" ref={floorRef} className="scroll-mt-36">
-          <SectionTitle
-            title="Floor plan"
-            subtitle={
-              data.floor_plan_url
-                ? 'View the official organizer map, or book stalls on the interactive plan.'
-                : 'Click any stall to open the exhibitor company, contacts and booth highlights.'
-            }
-          />
-          <div className="mt-6">
-            {data.status === 'past' ? (
-              <div className="rounded-3xl border border-dashed border-ink-200 bg-ink-50 py-16 text-center text-ink-500">
-                This exhibition has concluded. The final stall layout is archived.
-              </div>
-            ) : (
-              <FloorPlanSection
-                data={data}
-                floorView={floorView}
-                setFloorView={setFloorView}
-              />
+              </aside>
             )}
           </div>
         </section>
 
-        {/* Top exhibitors */}
-        <section id="exhibitors" className="scroll-mt-36">
-          <SectionTitle title="Top exhibitors" subtitle="Featured brands you’ll meet on the show floor." />
-          {topExhibitors.length === 0 ? (
-            <div className="mt-6 rounded-3xl border border-dashed border-ink-200 bg-ink-50 py-12 text-center text-ink-500">Exhibitor list opens closer to the event.</div>
-          ) : (
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {topExhibitors.map((c, i) => (
-                <Link
-                  key={`${c.id}-${c.stall_code}`}
-                  to={`/company/${c.id}?exhibition=${data.id}`}
-                  className="group relative overflow-hidden rounded-3xl border border-ink-100 bg-white p-5 shadow-card transition-all hover:-translate-y-1 hover:shadow-soft"
-                >
-                  {i < 3 && (
-                    <span className="absolute right-3 top-3 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Top {i + 1}</span>
-                  )}
-                  <img src={c.logo} alt="" className="h-14 w-14 rounded-2xl object-cover" />
-                  <div className="mt-3 truncate font-display text-base font-bold text-ink-900">{c.name}</div>
-                  <div className="truncate text-xs text-ink-400">{c.industry}</div>
-                  <div className="mt-2 text-[11px] font-semibold text-brand-600">{c.hall_name} · Stall {c.stall_code}</div>
-                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-ink-400 group-hover:text-brand-600">
-                    View profile <ArrowRight width={13} />
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Documents */}
-        <section id="docs" className="scroll-mt-36">
-          <SectionTitle title="Event documents" subtitle="Download visitor guides, maps and manuals as PDF." />
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {docs.length === 0 ? (
-              <div className="col-span-full rounded-3xl border border-dashed border-ink-200 bg-ink-50 py-12 text-center text-ink-500">Documents coming soon.</div>
-            ) : docs.map((d) => (
-              <a
-                key={d.name}
-                href={d.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-4 rounded-2xl border border-ink-100 bg-white p-4 transition-shadow hover:shadow-soft"
-              >
-                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600">
-                  <Download width={20} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold text-ink-900">{d.name}</div>
-                  <div className="text-xs uppercase text-ink-400">{d.type || 'PDF'} file</div>
+        {/* 02 · Floor plan — full-bleed tinted band */}
+        <section id="floor" className="scroll-mt-32 border-y border-ink-100 bg-ink-50/60 py-12">
+          <div className="container-px">
+            <SectionTitle
+              eyebrow="02 · Walk the halls"
+              title="Floor plan"
+              subtitle={
+                data.floor_plan_url
+                  ? 'View the official organizer map, or book stalls on the interactive plan.'
+                  : 'Click any stall to open the exhibitor company, contacts and booth highlights.'
+              }
+            />
+            <div className="mt-6">
+              {data.status === 'past' ? (
+                <div className="rounded-3xl border border-dashed border-ink-200 bg-white py-16 text-center text-ink-500">
+                  This exhibition has concluded. The final stall layout is archived.
                 </div>
-                <span className="text-sm font-semibold text-brand-600">Open</span>
-              </a>
-            ))}
+              ) : (
+                <FloorPlanSection data={data} floorView={floorView} setFloorView={setFloorView} />
+              )}
+            </div>
           </div>
         </section>
 
-        {/* Reels — compact phone tiles */}
-        <section id="reels" className="scroll-mt-36">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <SectionTitle title="Reels & shorts" subtitle="Quick clips from the venue — swipe-friendly size." />
-            {canManageMedia && (
-              <span className="pill border border-brand-200 bg-brand-soft text-brand-700">Organizer / admin</span>
+        {/* 03 · Exhibitors */}
+        <section id="exhibitors" className="container-px scroll-mt-32 py-12">
+          <SectionTitle eyebrow="03 · Who's showing" title="Exhibitors" subtitle="Brands you’ll meet on the show floor — tap to open the profile." />
+          <div>
+            {data.exhibitors.length === 0 ? (
+              <div className="mt-6 rounded-3xl border border-dashed border-ink-200 bg-ink-50 py-12 text-center text-ink-500">Exhibitor list opens closer to the event.</div>
+            ) : (
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {data.exhibitors.map((c, i) => (
+                  <Link
+                    key={`${c.id}-${c.stall_code}`}
+                    to={`/company/${c.id}?exhibition=${data.id}`}
+                    className="group relative overflow-hidden rounded-3xl border border-ink-100 bg-white p-5 shadow-card transition-all hover:-translate-y-1 hover:shadow-soft"
+                  >
+                    {i < 3 && (
+                      <span className="absolute right-3 top-3 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">Top {i + 1}</span>
+                    )}
+                    <img src={c.logo} alt="" className="h-14 w-14 rounded-2xl object-cover" />
+                    <div className="mt-3 truncate font-display text-base font-bold text-ink-900">{c.name}</div>
+                    <div className="truncate text-xs text-ink-400">{c.industry}</div>
+                    <div className="mt-2 text-[11px] font-semibold text-brand-600">{c.hall_name} · Stall {c.stall_code}</div>
+                    <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-ink-400 group-hover:text-brand-600">
+                      View profile <ArrowRight width={13} />
+                    </span>
+                  </Link>
+                ))}
+              </div>
             )}
           </div>
-          {(data.reel_url || reels.length > 0) ? (
-            <div className="mt-6 flex gap-3 overflow-x-auto pb-2">
-              {data.reel_url && (
-                <ReelCard url={data.reel_url} caption="Official event reel" author="Organizer" />
+        </section>
+
+        {/* 04 · Media — dark media wall */}
+        <section id="media" className="scroll-mt-32 bg-ink-950 py-14">
+          <div className="container-px space-y-12">
+            {/* Reels */}
+            <div>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <SectionTitle tone="dark" eyebrow="04 · Watch it live" title="Reels & shorts" subtitle="Quick clips from the venue." />
+                {canManageMedia && <span className="pill border border-white/20 bg-white/10 text-white">Organizer / admin</span>}
+              </div>
+              {(data.reel_url || reels.length > 0) ? (
+                <div className="mt-5 flex gap-3 overflow-x-auto pb-2">
+                  {data.reel_url && <ReelCard url={data.reel_url} caption="Official event reel" author="Organizer" />}
+                  {reels.map((m) => (
+                    <ReelCard key={m.id} url={m.url} caption={m.caption || 'Shared reel'} author={m.author_name} />
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-white/5 px-4 py-10 text-center text-sm text-white/60">
+                  No reels yet{canManageMedia ? ' — add one below.' : '.'}
+                </div>
               )}
-              {reels.map((m) => (
-                <ReelCard key={m.id} url={m.url} caption={m.caption || 'Shared reel'} author={m.author_name} />
-              ))}
-            </div>
-          ) : (
-            <div className="mt-6 rounded-2xl border border-dashed border-ink-200 bg-ink-50 px-4 py-10 text-center text-sm text-ink-500">
-              No reels yet{canManageMedia ? ' — add one below.' : '.'}
-            </div>
-          )}
-          {canManageMedia ? (
-            <div className="mt-5">
-              <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="reel" onAdded={onMediaAdded} lockedKind="reel" />
-            </div>
-          ) : (
-            <p className="mt-4 text-xs text-ink-400">Only organizers and admins can add reels.</p>
-          )}
-        </section>
-
-        {/* Videos — compact grid */}
-        <section id="videos" className="scroll-mt-36">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <SectionTitle title="Videos" subtitle="Walkthroughs and highlights in a compact player." />
-            {canManageMedia && (
-              <span className="pill border border-brand-200 bg-brand-soft text-brand-700">Organizer / admin</span>
-            )}
-          </div>
-          {(data.youtube_url || videos.length > 0) ? (
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {data.youtube_url && (
-                <VideoCard url={data.youtube_url} title="Official highlights" />
+              {canManageMedia && (
+                <div className="mt-5">
+                  <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="reel" onAdded={onMediaAdded} lockedKind="reel" />
+                </div>
               )}
-              {videos.map((m) => (
-                <VideoCard key={m.id} url={m.url} title={m.caption || 'Shared video'} subtitle={`by ${m.author_name}`} />
-              ))}
             </div>
-          ) : (
-            <div className="mt-6 rounded-2xl border border-dashed border-ink-200 bg-ink-50 px-4 py-10 text-center text-sm text-ink-500">
-              No videos yet{canManageMedia ? ' — add one below.' : '.'}
-            </div>
-          )}
-          {canManageMedia ? (
-            <div className="mt-5">
-              <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="video" onAdded={onMediaAdded} allowUpload lockedKind="video" />
-            </div>
-          ) : (
-            <p className="mt-4 text-xs text-ink-400">Only organizers and admins can add videos.</p>
-          )}
-        </section>
 
-        {/* Gallery */}
-        <section id="gallery" className="scroll-mt-36">
-          <SectionTitle title="Photo gallery" subtitle="Moments from the halls." />
-          <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            {allPhotos.map((g, i) => (
-              <button key={`${g}-${i}`} onClick={() => setLightbox(g)} className="group overflow-hidden rounded-2xl">
-                <img src={g} alt="" className="h-32 w-full object-cover transition-transform duration-500 group-hover:scale-105 md:h-40" />
-              </button>
-            ))}
+            {/* Videos */}
+            <div>
+              <SectionTitle tone="dark" title="Videos" subtitle="Walkthroughs and highlights." />
+              {(data.youtube_url || videos.length > 0) ? (
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {data.youtube_url && <VideoCard url={data.youtube_url} title="Official highlights" />}
+                  {videos.map((m) => (
+                    <VideoCard key={m.id} url={m.url} title={m.caption || 'Shared video'} subtitle={`by ${m.author_name}`} />
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-white/5 px-4 py-10 text-center text-sm text-white/60">
+                  No videos yet{canManageMedia ? ' — add one below.' : '.'}
+                </div>
+              )}
+              {canManageMedia && (
+                <div className="mt-5">
+                  <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="video" onAdded={onMediaAdded} allowUpload lockedKind="video" />
+                </div>
+              )}
+            </div>
+
+            {/* Photos */}
+            <div>
+              <SectionTitle tone="dark" title="Photo gallery" subtitle="Moments from the halls." />
+              {allPhotos.length > 0 ? (
+                <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                  {allPhotos.map((g, i) => (
+                    <button key={`${g}-${i}`} onClick={() => setLightbox(g)} className="group overflow-hidden rounded-2xl">
+                      <img src={g} alt="" className="h-32 w-full object-cover transition-transform duration-500 group-hover:scale-105 md:h-40" />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-white/50">Photos will appear here when the organizer adds them.</p>
+              )}
+              {canManageMedia && (
+                <div className="mt-5">
+                  <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="photo" onAdded={onMediaAdded} allowUpload lockedKind="photo" />
+                </div>
+              )}
+            </div>
           </div>
-          {canManageMedia ? (
-            <div className="mt-5">
-              <AddMediaForm slug={data.slug} defaultName={user?.name} defaultKind="photo" onAdded={onMediaAdded} allowUpload lockedKind="photo" />
-            </div>
-          ) : allPhotos.length === 0 ? (
-            <p className="mt-4 text-sm text-ink-400">Photos will appear here when the organizer adds them.</p>
-          ) : null}
         </section>
 
-        {/* Comments / ratings */}
-        <section id="comments" className="scroll-mt-36">
-          <SectionTitle title="Reviews & comments" subtitle={`${comments.length} review${comments.length === 1 ? '' : 's'}${avgRating ? ` · ${avgRating}/5 average` : ''}`} />
+        {/* 05 · Reviews */}
+        <section id="reviews" className="container-px scroll-mt-32 py-12">
+          <SectionTitle
+            eyebrow="05 · Visitor voices"
+            title="Reviews & comments"
+            subtitle={`${comments.length} review${comments.length === 1 ? '' : 's'}${avgRating ? ` · ${avgRating}/5 average` : ''}`}
+          />
           <Comments
             comments={comments}
             slug={data.slug}
@@ -482,27 +504,34 @@ export default function ExhibitionDetail() {
           />
         </section>
 
-        {/* Schedule */}
-        <section id="schedule" className="scroll-mt-36">
-          <SectionTitle title="Seminar schedule" subtitle="Talks and panels during the show." />
-          <div className="mt-6 space-y-3">
-            {data.seminars.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-ink-200 bg-ink-50 py-12 text-center text-ink-500">Schedule coming soon.</div>
-            ) : data.seminars.map((s) => (
-              <div key={s.id} className="flex items-center gap-4 rounded-2xl border border-ink-100 bg-white p-4">
-                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-brand-50 text-center text-brand-700">
-                  <div className="text-[10px] font-bold uppercase">{s.day}</div>
+        {/* 06 · Schedule — timeline */}
+        <section id="schedule" className="scroll-mt-32 border-t border-ink-100 bg-ink-50/60 py-12">
+          <div className="container-px">
+            <SectionTitle eyebrow="06 · Plan your day" title="Seminar schedule" subtitle="Talks and panels during the show." />
+            <div className="mt-8 max-w-3xl">
+              {data.seminars.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-ink-200 bg-white py-12 text-center text-ink-500">Schedule coming soon.</div>
+              ) : (
+                <div className="relative ml-2 space-y-6 border-l-2 border-brand-200 pl-7">
+                  {data.seminars.map((s) => (
+                    <div key={s.id} className="relative">
+                      <span className="absolute -left-[37px] top-4 h-4 w-4 rounded-full border-4 border-white bg-brand" />
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-ink-100 bg-white p-4 shadow-sm">
+                        <span className="rounded-full bg-brand-50 px-3 py-1 text-[11px] font-bold uppercase text-brand-700">{s.day}</span>
+                        <div className="min-w-[180px] flex-1">
+                          <div className="font-semibold text-ink-900">{s.title}</div>
+                          <div className="text-sm text-ink-500">by {s.speaker}</div>
+                        </div>
+                        <div className="text-right text-sm">
+                          <div className="flex items-center justify-end gap-1.5 font-medium text-ink-700"><Clock width={15} /> {s.time}</div>
+                          <div className="text-xs text-ink-400">{s.hall}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-ink-900">{s.title}</div>
-                  <div className="text-sm text-ink-500">by {s.speaker}</div>
-                </div>
-                <div className="text-right text-sm">
-                  <div className="flex items-center gap-1.5 font-medium text-ink-700"><Clock width={15} /> {s.time}</div>
-                  <div className="text-xs text-ink-400">{s.hall}</div>
-                </div>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
         </section>
       </div>
@@ -528,39 +557,43 @@ function ShareIcon() {
   );
 }
 
-function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+function SectionTitle({ title, subtitle, eyebrow, tone = 'light' }: { title: string; subtitle?: string; eyebrow?: string; tone?: 'light' | 'dark' }) {
+  const dark = tone === 'dark';
   return (
     <div>
-      <h2 className="font-display text-2xl font-extrabold text-ink-900 sm:text-3xl">{title}</h2>
-      {subtitle && <p className="mt-1.5 max-w-2xl text-sm text-ink-500 sm:text-base">{subtitle}</p>}
+      {eyebrow && (
+        <div className={`mb-2 text-[11px] font-bold uppercase tracking-[0.18em] ${dark ? 'text-brand-300' : 'text-brand-600'}`}>{eyebrow}</div>
+      )}
+      <h2 className={`font-display text-2xl font-extrabold sm:text-3xl ${dark ? 'text-white' : 'text-ink-900'}`}>{title}</h2>
+      {subtitle && <p className={`mt-1.5 max-w-2xl text-sm sm:text-base ${dark ? 'text-white/60' : 'text-ink-500'}`}>{subtitle}</p>}
       <div className="mt-3 h-1 w-12 rounded-full bg-grad" />
     </div>
   );
 }
 
-function HeroStat({ label, value }: { label: string; value: React.ReactNode }) {
+function TicketCell({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
-      <div className="font-display text-xl font-extrabold text-white sm:text-2xl">{value}</div>
-      <div className="text-[11px] font-medium text-white/65">{label}</div>
+    <div className="flex items-start gap-3 border-ink-100 px-5 py-4 [&:not(:first-child)]:border-l max-lg:[&:nth-child(odd)]:border-l-0 max-lg:[&:nth-child(n+3)]:border-t">
+      <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">{icon}</span>
+      <div className="flex min-w-0 flex-col">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-ink-400">{label}</span>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function TicketStat({ value, label }: { value: React.ReactNode; label: string }) {
+  return (
+    <div className="text-center">
+      <div className="font-display text-xl font-extrabold text-ink-900">{value}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">{label}</div>
     </div>
   );
 }
 
 function Chip({ children }: { children: React.ReactNode }) {
   return <span className="rounded-full bg-ink-100 px-3 py-1 text-xs font-semibold text-ink-700">{children}</span>;
-}
-
-function Row({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-ink-50 text-ink-500">{icon}</span>
-      <div>
-        <dt className="text-[11px] uppercase tracking-wide text-ink-400">{label}</dt>
-        <dd className="font-medium text-ink-800">{value}</dd>
-      </div>
-    </div>
-  );
 }
 
 function SocialBtn({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
@@ -671,7 +704,7 @@ function AddMediaForm({
   };
 
   return (
-    <form onSubmit={submit} className="rounded-2xl border border-brand-100 bg-brand-soft/40 p-4">
+    <form onSubmit={submit} className="rounded-2xl border border-ink-100 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-bold text-ink-900">
