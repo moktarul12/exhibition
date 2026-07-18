@@ -175,8 +175,9 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
         )}
       </div>
 
-      {/* Side panel — full content, no inner scroll */}
-      <div className="h-fit rounded-[1.75rem] border border-ink-100/80 bg-white shadow-[0_24px_60px_-28px_rgba(21,19,33,0.3)]">
+      {/* Side panel — sticky beside the map, scrolls its own content */}
+      <div className="h-fit rounded-[1.75rem] border border-ink-100/80 bg-white shadow-[0_24px_60px_-28px_rgba(21,19,33,0.3)] lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100vh-7rem)] lg:flex-col lg:overflow-hidden">
+        <div className="relative lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
         {!selected ? (
           <div className="px-6 py-14 text-center">
             <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[#f3efe8] text-ink-500">
@@ -335,6 +336,11 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
             )}
           </div>
         )}
+        {/* Scroll cue — fades out content near the bottom edge on tall panels */}
+        {selected && !confirmed && (
+          <div className="pointer-events-none sticky bottom-0 hidden h-8 bg-gradient-to-t from-white to-transparent lg:block" />
+        )}
+        </div>
       </div>
     </div>
   );

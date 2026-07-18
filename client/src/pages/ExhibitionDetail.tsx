@@ -10,7 +10,7 @@ import {
   Heart, Bookmark, Download, Instagram, Youtube, Facebook, Linkedin, Twitter, Check,
 } from '../components/icons';
 import { useAuth } from '../auth';
-import { toEmbedUrl, mediaKind } from '../media';
+import { toEmbedUrl, mediaKind, youtubeThumb } from '../media';
 
 type Detail = Exhibition & {
   organizer: Organizer;
@@ -426,7 +426,7 @@ export default function ExhibitionDetail() {
                 {canManageMedia && <span className="pill border border-white/20 bg-white/10 text-white">Organizer / admin</span>}
               </div>
               {(data.reel_url || reels.length > 0) ? (
-                <div className="mt-5 flex gap-3 overflow-x-auto pb-2">
+                <div className="no-scrollbar mt-6 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-3">
                   {data.reel_url && <ReelCard url={data.reel_url} caption="Official event reel" author="Organizer" />}
                   {reels.map((m) => (
                     <ReelCard key={m.id} url={m.url} caption={m.caption || 'Shared reel'} author={m.author_name} />
@@ -444,16 +444,16 @@ export default function ExhibitionDetail() {
               )}
             </div>
 
-            {/* Videos */}
+            {/* Videos — cinema layout */}
             <div>
-              <SectionTitle tone="dark" title="Videos" subtitle="Walkthroughs and highlights." />
+              <SectionTitle tone="dark" title="Videos" subtitle="Pick from the playlist — plays in the big screen." />
               {(data.youtube_url || videos.length > 0) ? (
-                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {data.youtube_url && <VideoCard url={data.youtube_url} title="Official highlights" />}
-                  {videos.map((m) => (
-                    <VideoCard key={m.id} url={m.url} title={m.caption || 'Shared video'} subtitle={`by ${m.author_name}`} />
-                  ))}
-                </div>
+                <VideoCinema
+                  items={[
+                    ...(data.youtube_url ? [{ key: 'official', url: data.youtube_url, title: 'Official highlights', subtitle: 'Organizer' }] : []),
+                    ...videos.map((m) => ({ key: String(m.id), url: m.url, title: m.caption || 'Shared video', subtitle: `by ${m.author_name}` })),
+                  ]}
+                />
               ) : (
                 <div className="mt-5 rounded-2xl border border-dashed border-white/15 bg-white/5 px-4 py-10 text-center text-sm text-white/60">
                   No videos yet{canManageMedia ? ' — add one below.' : '.'}
@@ -604,43 +604,106 @@ function SocialBtn({ href, label, children }: { href: string; label: string; chi
   );
 }
 
+/** Phone-framed reel card for the dark media wall. */
 function ReelCard({ url, caption, author }: { url: string; caption: string; author: string }) {
   const embed = toEmbedUrl(url);
   const kind = mediaKind(url);
   return (
-    <div className="w-[180px] shrink-0 overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm sm:w-[200px]">
-      <div className="relative aspect-[9/16] h-[340px] max-h-[380px] bg-ink-950 sm:h-[380px]">
-        {embed ? (
-          <iframe title={caption} src={embed} className="h-full w-full border-0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowFullScreen />
-        ) : (
-          <a href={url} target="_blank" rel="noreferrer" className="grid h-full place-items-center p-2 text-center text-[10px] text-white/80 break-all">{url}</a>
-        )}
-      </div>
-      <div className="p-2.5">
-        <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-brand-600">
-          {kind === 'instagram' ? <Instagram width={10} /> : <Youtube width={10} />} {kind === 'instagram' ? 'IG' : 'Short'}
+    <div className="group w-[240px] shrink-0 snap-start sm:w-[260px]">
+      <div className="rounded-[2rem] border border-white/15 bg-ink-900 p-2 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)] transition-transform duration-300 group-hover:-translate-y-1.5">
+        {/* Phone notch */}
+        <div className="mx-auto mb-1.5 h-1.5 w-14 rounded-full bg-white/15" />
+        <div className="relative aspect-[9/16] overflow-hidden rounded-[1.45rem] bg-ink-950">
+          {embed ? (
+            <iframe title={caption} src={embed} className="h-full w-full border-0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" allowFullScreen />
+          ) : (
+            <a href={url} target="_blank" rel="noreferrer" className="grid h-full place-items-center p-3 text-center text-[10px] text-white/70 break-all">{url}</a>
+          )}
         </div>
-        <div className="mt-0.5 line-clamp-1 text-xs font-semibold text-ink-900">{caption}</div>
-        <div className="truncate text-[10px] text-ink-400">{author}</div>
+        <div className="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5">
+          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${kind === 'instagram' ? 'bg-gradient-to-tr from-amber-400 via-pink-500 to-purple-600' : 'bg-red-600'} text-white`}>
+            {kind === 'instagram' ? <Instagram width={13} /> : <Youtube width={13} />}
+          </span>
+          <div className="min-w-0">
+            <div className="line-clamp-1 text-xs font-semibold text-white">{caption}</div>
+            <div className="truncate text-[10px] text-white/50">{author}</div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function VideoCard({ url, title, subtitle }: { url: string; title: string; subtitle?: string }) {
-  const embed = toEmbedUrl(url);
+type CinemaItem = { key: string; url: string; title: string; subtitle?: string };
+
+/** Cinema layout — one large featured player, playlist of the rest beside it. */
+function VideoCinema({ items }: { items: CinemaItem[] }) {
+  const [current, setCurrent] = useState(0);
+  const active = items[Math.min(current, items.length - 1)];
+  const embed = toEmbedUrl(active.url);
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm">
-      <div className="aspect-video max-h-[180px] bg-ink-950 sm:max-h-[200px]">
-        {embed ? (
-          <iframe title={title} src={embed} className="h-full w-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-        ) : (
-          <video src={url} controls className="h-full w-full object-contain" />
-        )}
+    <div className="mt-6 grid gap-4 lg:grid-cols-[1.9fr_1fr]">
+      {/* Featured player */}
+      <div className="overflow-hidden rounded-3xl border border-white/10 bg-ink-900 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)]">
+        <div className="aspect-video bg-ink-950">
+          {embed ? (
+            <iframe
+              key={active.key}
+              title={active.title}
+              src={embed}
+              className="h-full w-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <video key={active.key} src={active.url} controls className="h-full w-full object-contain" />
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-bold text-white">{active.title}</div>
+            {active.subtitle && <div className="truncate text-[11px] text-white/50">{active.subtitle}</div>}
+          </div>
+          <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white/60">
+            {current + 1} / {items.length}
+          </span>
+        </div>
       </div>
-      <div className="px-3 py-2.5">
-        <div className="line-clamp-1 text-sm font-semibold text-ink-900">{title}</div>
-        {subtitle && <div className="truncate text-[11px] text-ink-400">{subtitle}</div>}
+
+      {/* Playlist */}
+      <div className="no-scrollbar flex gap-3 overflow-x-auto lg:max-h-[440px] lg:flex-col lg:overflow-y-auto lg:overflow-x-visible">
+        {items.map((v, i) => {
+          const thumb = youtubeThumb(v.url);
+          const isActive = i === current;
+          return (
+            <button
+              key={v.key}
+              type="button"
+              onClick={() => setCurrent(i)}
+              className={`flex w-[240px] shrink-0 items-center gap-3 rounded-2xl border p-2.5 text-left transition lg:w-full ${
+                isActive ? 'border-brand-400/60 bg-white/10' : 'border-white/10 bg-white/5 hover:bg-white/10'
+              }`}
+            >
+              <div className="relative h-14 w-24 shrink-0 overflow-hidden rounded-xl bg-ink-950">
+                {thumb ? (
+                  <img src={thumb} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="grid h-full w-full place-items-center text-white/40"><Youtube width={18} /></div>
+                )}
+                <span className="absolute inset-0 grid place-items-center">
+                  <span className={`grid h-7 w-7 place-items-center rounded-full text-white backdrop-blur transition ${isActive ? 'bg-brand' : 'bg-black/50'}`}>
+                    {isActive ? <span className="text-[8px] font-black tracking-widest">▶</span> : <span className="ml-0.5 text-[10px]">▶</span>}
+                  </span>
+                </span>
+              </div>
+              <div className="min-w-0">
+                <div className={`line-clamp-2 text-xs font-semibold ${isActive ? 'text-white' : 'text-white/80'}`}>{v.title}</div>
+                {v.subtitle && <div className="mt-0.5 truncate text-[10px] text-white/40">{v.subtitle}</div>}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

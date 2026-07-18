@@ -48,3 +48,10 @@ export function toEmbedUrl(url?: string | null): string | null {
 export function isEmbeddable(url?: string | null): boolean {
   return !!toEmbedUrl(url);
 }
+
+// Thumbnail image for a YouTube link (null for other providers).
+export function youtubeThumb(url?: string | null): string | null {
+  if (!url || mediaKind(url) !== 'youtube') return null;
+  const id = youtubeId(url);
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
+}
