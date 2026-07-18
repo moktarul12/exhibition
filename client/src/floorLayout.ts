@@ -1,4 +1,4 @@
-import type { Hall, FloorMarkers, FloorMarker, Stall } from './types';
+import type { Hall, FloorMarkers, FloorMarker, Stall, FloorGateSide } from './types';
 
 /** Resolve per-row stall counts for a hall (supports irregular layouts). */
 export function hallRowLayout(hall?: Hall | null): number[] {
@@ -17,9 +17,13 @@ export function layoutStallTotal(layout: number[]) {
 
 export function hallMarkers(hall?: Hall | null): FloorMarkers {
   const m = hall?.markers;
+  const side = (v: unknown, fallback: FloorGateSide): FloorGateSide =>
+    v === 'top' || v === 'bottom' || v === 'left' || v === 'right' ? v : fallback;
   return {
     entrance_label: m?.entrance_label || 'Main entrance',
     exit_label: m?.exit_label || 'Exit / registration',
+    entrance_side: side(m?.entrance_side, 'top'),
+    exit_side: side(m?.exit_side, 'bottom'),
     items: Array.isArray(m?.items) ? m!.items : [],
   };
 }

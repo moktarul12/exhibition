@@ -1,5 +1,5 @@
 import { useMemo, type CSSProperties } from 'react';
-import type { Stall, FloorMarker } from '../types';
+import type { Stall, FloorMarker, FloorGateSide } from '../types';
 import { stallSpans, MARKER_META } from '../floorLayout';
 
 /** Soft exhibition palette — light hall, clear status */
@@ -30,6 +30,8 @@ type Props = {
   markers: FloorMarker[];
   entranceLabel?: string;
   exitLabel?: string;
+  entranceSide?: FloorGateSide;
+  exitSide?: FloorGateSide;
   selectedId?: number | null;
   selectedIds?: Set<number>;
   search?: string;
@@ -48,6 +50,8 @@ export default function FloorPlan3D({
   markers,
   entranceLabel = 'Main entrance',
   exitLabel = 'Exit / registration',
+  entranceSide = 'top',
+  exitSide = 'bottom',
   selectedId,
   selectedIds,
   search = '',
@@ -184,13 +188,44 @@ export default function FloorPlan3D({
               }}
             />
 
-            {/* Entrance ribbon */}
-            <div
-              className="absolute left-6 right-6 top-4 flex h-8 items-center justify-center rounded-2xl text-[10px] font-bold uppercase tracking-[0.18em] text-white shadow-md"
-              style={{ background: 'linear-gradient(90deg, #059669, #10b981)' }}
-            >
-              {entranceLabel}
-            </div>
+            {/* Gate ribbons — any wall */}
+            {(['top', 'bottom', 'left', 'right'] as FloorGateSide[]).flatMap((side) => {
+              const gates: { kind: 'enter' | 'exit'; label: string }[] = [];
+              if (entranceSide === side) gates.push({ kind: 'enter', label: entranceLabel });
+              if (exitSide === side) gates.push({ kind: 'exit', label: exitLabel });
+              return gates.map((g, gi) => {
+                const enter = g.kind === 'enter';
+                const style: CSSProperties =
+                  side === 'top'
+                    ? { left: 24, right: 24, top: 12 + gi * 36, height: 28 }
+                    : side === 'bottom'
+                      ? { left: 24, right: 24, bottom: 12 + gi * 36, height: 28 }
+                      : side === 'left'
+                        ? { left: 10 + gi * 28, top: 52, bottom: 52, width: 24 }
+                        : { right: 10 + gi * 28, top: 52, bottom: 52, width: 24 };
+                const vertical = side === 'left' || side === 'right';
+                return (
+                  <div
+                    key={`${side}-${g.kind}`}
+                    className="absolute flex items-center justify-center rounded-2xl text-[9px] font-bold uppercase tracking-[0.14em] shadow-md"
+                    style={{
+                      ...style,
+                      background: enter
+                        ? 'linear-gradient(90deg, #059669, #10b981)'
+                        : 'rgba(255,255,255,0.85)',
+                      color: enter ? '#fff' : '#475569',
+                      writingMode: vertical ? 'vertical-rl' : undefined,
+                      transform: side === 'left' ? 'rotate(180deg)' : undefined,
+                      boxShadow: enter
+                        ? undefined
+                        : 'inset 0 0 0 1px rgba(21,19,33,0.06)',
+                    }}
+                  >
+                    {g.label}
+                  </div>
+                );
+              });
+            })}
 
             <div className="absolute" style={{ left: 36, top: 52, width: floorW, height: floorH }}>
               {/* Open plaza / row gaps */}
@@ -297,13 +332,6 @@ export default function FloorPlan3D({
                   variant={i % 3}
                 />
               ))}
-            </div>
-
-            <div
-              className="absolute bottom-4 left-6 right-6 flex h-8 items-center justify-center rounded-2xl text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500"
-              style={{ background: 'rgba(255,255,255,0.75)', boxShadow: 'inset 0 0 0 1px rgba(21,19,33,0.06)' }}
-            >
-              {exitLabel}
             </div>
           </div>
 

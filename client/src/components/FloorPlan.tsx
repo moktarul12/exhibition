@@ -25,7 +25,7 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [availableOnly, setAvailableOnly] = useState(false);
-  const [viewMode, setViewMode] = useState<FloorViewMode>('3d');
+  const [viewMode, setViewMode] = useState<FloorViewMode>('2d');
   const [bookStep, setBookStep] = useState<1 | 2>(1);
   const [booking, setBooking] = useState(false);
   const [confirmed, setConfirmed] = useState<{ reference: string } | null>(null);
@@ -148,6 +148,8 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
               markers={markers.items}
               entranceLabel={markers.entrance_label}
               exitLabel={markers.exit_label}
+              entranceSide={markers.entrance_side}
+              exitSide={markers.exit_side}
               selectedId={selected?.id}
               search={search}
               dimUnavailable={availableOnly || statusFilter === 'available'}
@@ -162,6 +164,8 @@ export default function FloorPlan({ halls, exhibitionName }: { halls: Hall[]; ex
               markers={markers.items}
               entranceLabel={markers.entrance_label}
               exitLabel={markers.exit_label}
+              entranceSide={markers.entrance_side}
+              exitSide={markers.exit_side}
               selectedId={selected?.id}
               search={search}
               dimStall={dimStall}

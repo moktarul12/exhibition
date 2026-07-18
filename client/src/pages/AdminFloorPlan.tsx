@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, formatINR } from '../api';
-import type { Exhibition, FloorMarker, FloorMarkerKind, Hall, Stall, StallDisplaySize } from '../types';
+import type { Exhibition, FloorMarker, FloorMarkerKind, FloorGateSide, Hall, Stall, StallDisplaySize } from '../types';
 import { Spinner, stallColors } from '../components/ui';
 import { Grid, Ticket, X, Plus, Trash2, Move, RefreshCw } from '../components/icons';
 import { hallMarkers, hallRowLayout, layoutStallTotal, MARKER_META, SIZE_META, stallSpans } from '../floorLayout';
@@ -107,6 +107,8 @@ export default function AdminFloorPlan() {
   const [hallNameEdit, setHallNameEdit] = useState('');
   const [entranceLabel, setEntranceLabel] = useState('Main entrance');
   const [exitLabel, setExitLabel] = useState('Exit / registration');
+  const [entranceSide, setEntranceSide] = useState<FloorGateSide>('top');
+  const [exitSide, setExitSide] = useState<FloorGateSide>('bottom');
   const [paintSize, setPaintSize] = useState<StallDisplaySize>('medium');
   const [placeTool, setPlaceTool] = useState<PlaceTool>({ kind: 'stall' });
   /** Footprint for next place / selected amenity — default 1×1 */
@@ -191,8 +193,18 @@ export default function AdminFloorPlan() {
     const m = hallMarkers(hall);
     setEntranceLabel(m.entrance_label);
     setExitLabel(m.exit_label);
+    setEntranceSide(m.entrance_side || 'top');
+    setExitSide(m.exit_side || 'bottom');
   }, [hallId, halls]);
 
+  const withGateLabels = (extra: Partial<typeof markers> = {}) => ({
+    ...markers,
+    entrance_label: entranceLabel,
+    exit_label: exitLabel,
+    entrance_side: entranceSide,
+    exit_side: exitSide,
+    ...extra,
+  });
   const commitSelectStall = (stall: Stall, e?: React.MouseEvent) => {
     setSelectedMarkerId(null);
     setPlaceTool({ kind: 'stall' });
@@ -471,7 +483,7 @@ export default function AdminFloorPlan() {
     try {
       const r = await api.patch(`/admin/halls/${hallId}`, {
         name: hallNameEdit.trim(),
-        markers: { ...markers, entrance_label: entranceLabel, exit_label: exitLabel },
+        markers: withGateLabels(),
       });
       setHalls((hs) => hs.map((h) => (h.id === hallId ? r.data : h)));
       flash('Hall updated');
@@ -495,7 +507,7 @@ export default function AdminFloorPlan() {
       await api.patch(`/admin/halls/${hallId}`, {
         name: hallNameEdit.trim() || hall?.name,
         row_layout,
-        markers: { ...markers, entrance_label: entranceLabel, exit_label: exitLabel },
+        markers: withGateLabels(),
       });
       await reloadHalls(selectedSlug, hallId);
       loadStalls();
@@ -599,7 +611,7 @@ export default function AdminFloorPlan() {
       const items = markers.items.filter((x) => x.id !== markerId);
       const hallRes = await api.patch(`/admin/halls/${hallId}`, {
         name: hallNameEdit.trim() || hall?.name,
-        markers: { ...markers, entrance_label: entranceLabel, exit_label: exitLabel, items },
+        markers: withGateLabels({ items }),
       });
       setHalls((hs) => hs.map((h) => (h.id === hallId ? hallRes.data : h)));
       setSelectedMarkerId(null);
@@ -762,7 +774,7 @@ export default function AdminFloorPlan() {
         setSelectedIds(new Set());
         setPlaceTool({ kind: 'marker', marker: kind });
       }
-      await persistMarkers({ ...markers, entrance_label: entranceLabel, exit_label: exitLabel, items });
+      await persistMarkers(withGateLabels({ items }));
       loadStalls();
       flash(`${MARKER_META[kind]?.label || 'Amenity'} · ${spans.span_cols}×${spans.span_rows}`);
     } catch (e: unknown) {
@@ -780,7 +792,7 @@ export default function AdminFloorPlan() {
       setSaving(true);
       let items = await clearFootprintForAmenity(m.grid_row, m.grid_col, span_cols, span_rows, selectedMarkerId);
       items = items.map((x) => (x.id === selectedMarkerId ? { ...x, span_cols, span_rows } : x));
-      await persistMarkers({ ...markers, entrance_label: entranceLabel, exit_label: exitLabel, items });
+      await persistMarkers(withGateLabels({ items }));
       setMarkerPaint({ span_cols, span_rows });
       loadStalls();
       flash(`Footprint → ${span_cols}×${span_rows}`);
@@ -795,13 +807,13 @@ export default function AdminFloorPlan() {
     if (!selectedMarkerId) return;
     const items = markers.items.filter((m) => m.id !== selectedMarkerId);
     setSelectedMarkerId(null);
-    await persistMarkers({ ...markers, entrance_label: entranceLabel, exit_label: exitLabel, items });
+    await persistMarkers(withGateLabels({ items }));
   };
 
   const updateSelectedMarker = async (patch: Partial<FloorMarker>) => {
     if (!selectedMarkerId) return;
     const items = markers.items.map((m) => (m.id === selectedMarkerId ? { ...m, ...patch } : m));
-    await persistMarkers({ ...markers, entrance_label: entranceLabel, exit_label: exitLabel, items });
+    await persistMarkers(withGateLabels({ items }));
   };
 
   const moveSelectedGroup = async (primaryId: number, row: number, col: number) => {
@@ -1004,7 +1016,7 @@ export default function AdminFloorPlan() {
         items = items.map((x) => (x.id === selectedMarkerId
           ? { ...x, kind: next.marker, label: MARKER_META[next.marker].label, ...spans }
           : x));
-        await persistMarkers({ ...markers, entrance_label: entranceLabel, exit_label: exitLabel, items });
+        await persistMarkers(withGateLabels({ items }));
         loadStalls();
         flash(`Type → ${MARKER_META[next.marker].label}`);
       } catch (err: unknown) {
@@ -1221,7 +1233,7 @@ export default function AdminFloorPlan() {
       await api.patch(`/admin/halls/${hallId}`, {
         name: hallNameEdit.trim() || hall?.name,
         row_layout: nextLayout,
-        markers: { ...markers, entrance_label: entranceLabel, exit_label: exitLabel },
+        markers: withGateLabels(),
       });
       await reloadHalls(selectedSlug, hallId);
     } catch {
@@ -1510,10 +1522,36 @@ export default function AdminFloorPlan() {
                       <input className="input py-1.5 text-sm" value={entranceLabel} onChange={(e) => setEntranceLabel(e.target.value)} />
                     </label>
                     <label className="block text-xs">
+                      <span className="mb-1 block font-semibold text-ink-500">Entrance wall</span>
+                      <select
+                        className="input py-1.5 text-sm"
+                        value={entranceSide}
+                        onChange={(e) => setEntranceSide(e.target.value as FloorGateSide)}
+                      >
+                        <option value="top">Top</option>
+                        <option value="bottom">Bottom</option>
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                      </select>
+                    </label>
+                    <label className="block text-xs">
                       <span className="mb-1 block font-semibold text-ink-500">Exit label</span>
                       <input className="input py-1.5 text-sm" value={exitLabel} onChange={(e) => setExitLabel(e.target.value)} />
                     </label>
-                    <div className="sm:col-span-2">
+                    <label className="block text-xs">
+                      <span className="mb-1 block font-semibold text-ink-500">Exit wall</span>
+                      <select
+                        className="input py-1.5 text-sm"
+                        value={exitSide}
+                        onChange={(e) => setExitSide(e.target.value as FloorGateSide)}
+                      >
+                        <option value="top">Top</option>
+                        <option value="bottom">Bottom</option>
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                      </select>
+                    </label>
+                    <div className="sm:col-span-2 lg:col-span-4">
                       <span className="mb-1 block text-xs font-semibold text-ink-500">Stalls per row</span>
                       <div className="flex flex-wrap items-center gap-1">
                         {layoutEdit.map((count, i) => (
@@ -1521,6 +1559,7 @@ export default function AdminFloorPlan() {
                             onChange={(e) => { const next = [...layoutEdit]; next[i] = e.target.value; setLayoutEdit(next); }} />
                         ))}
                         <button onClick={applyLayout} disabled={saving} className="btn-outline py-1.5 text-xs">Apply layout</button>
+                        <button onClick={renameHall} disabled={saving} className="btn-primary py-1.5 text-xs">Save labels & walls</button>
                       </div>
                     </div>
                   </div>
@@ -1565,6 +1604,8 @@ export default function AdminFloorPlan() {
                       markers={markers.items}
                       entranceLabel={entranceLabel}
                       exitLabel={exitLabel}
+                      entranceSide={entranceSide}
+                      exitSide={exitSide}
                       selectedId={selected?.id}
                       selectedIds={selectedIds}
                       onStallClick={(stall) => selectStall(stall)}
@@ -1583,6 +1624,8 @@ export default function AdminFloorPlan() {
                       markers={markers.items}
                       entranceLabel={entranceLabel}
                       exitLabel={exitLabel}
+                      entranceSide={entranceSide}
+                      exitSide={exitSide}
                       editMode
                       saving={saving}
                       selectedId={selected?.id}

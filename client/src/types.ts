@@ -81,9 +81,15 @@ export interface FloorMarker {
   span_rows?: number;
 }
 
+export type FloorGateSide = 'top' | 'bottom' | 'left' | 'right';
+
 export interface FloorMarkers {
   entrance_label: string;
   exit_label: string;
+  /** Wall where the main entrance banner sits */
+  entrance_side?: FloorGateSide;
+  /** Wall where the exit banner sits */
+  exit_side?: FloorGateSide;
   items: FloorMarker[];
 }
 

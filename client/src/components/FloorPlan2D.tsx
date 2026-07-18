@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type { Stall, FloorMarker } from '../types';
+import type { Stall, FloorMarker, FloorGateSide } from '../types';
 import { stallSpans, MARKER_META } from '../floorLayout';
 import { stallColors } from './ui';
 import { Plus } from './icons';
@@ -18,6 +18,86 @@ function spanBlockHeight(spanRows: number) {
   return spanRows * CELL + (spanRows - 1) * betweenRows;
 }
 
+function GateRibbon({
+  kind,
+  label,
+  side,
+}: {
+  kind: 'enter' | 'exit';
+  label: string;
+  side: FloorGateSide;
+}) {
+  const enter = kind === 'enter';
+  const vertical = side === 'left' || side === 'right';
+  const bg = enter
+    ? 'linear-gradient(90deg, #047857, #10b981)'
+    : 'linear-gradient(90deg, #cbd5e1, #94a3b8)';
+  const text = enter ? 'text-white' : 'text-ink-700';
+
+  if (vertical) {
+    return (
+      <div
+        className={`flex shrink-0 items-center justify-center self-stretch rounded-[1.25rem] px-2 shadow-md ${text}`}
+        style={{
+          background: bg,
+          writingMode: 'vertical-rl',
+          textOrientation: 'mixed',
+          transform: side === 'left' ? 'rotate(180deg)' : undefined,
+          minWidth: 44,
+        }}
+        title={label}
+      >
+        <span className="py-4 text-[11px] font-bold uppercase tracking-[0.2em]">{label}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={side === 'top' ? 'mb-5' : 'mt-5'}>
+      {side === 'bottom' && (
+        <div className="mx-auto mt-1 h-2 w-2/3 max-w-xs rounded-t-2xl bg-ink-300/30" />
+      )}
+      <div
+        className={`mx-auto flex max-w-md items-center justify-center gap-2 rounded-[1.25rem] py-3 text-[11px] font-bold uppercase tracking-[0.2em] shadow-lg ${text}`}
+        style={{ background: bg }}
+      >
+        {enter && <span className="h-2 w-2 animate-pulse rounded-full bg-white/90" />}
+        {label}
+      </div>
+      {side === 'top' && (
+        <div className="mx-auto mt-1 h-2 w-2/3 max-w-xs rounded-b-2xl bg-emerald-700/20" />
+      )}
+    </div>
+  );
+}
+
+function GatesOnSide({
+  side,
+  entranceSide,
+  exitSide,
+  entranceLabel,
+  exitLabel,
+}: {
+  side: FloorGateSide;
+  entranceSide: FloorGateSide;
+  exitSide: FloorGateSide;
+  entranceLabel: string;
+  exitLabel: string;
+}) {
+  const items: { kind: 'enter' | 'exit'; label: string }[] = [];
+  if (entranceSide === side) items.push({ kind: 'enter', label: entranceLabel });
+  if (exitSide === side) items.push({ kind: 'exit', label: exitLabel });
+  if (!items.length) return null;
+  const vertical = side === 'left' || side === 'right';
+  return (
+    <div className={vertical ? 'flex flex-col gap-2 self-stretch' : 'w-full'}>
+      {items.map((g) => (
+        <GateRibbon key={`${side}-${g.kind}`} kind={g.kind} label={g.label} side={side} />
+      ))}
+    </div>
+  );
+}
+
 export type FootprintCell = {
   key: string;
   row: number;
@@ -31,6 +111,8 @@ type Props = {
   markers?: FloorMarker[];
   entranceLabel?: string;
   exitLabel?: string;
+  entranceSide?: FloorGateSide;
+  exitSide?: FloorGateSide;
   selectedId?: number | null;
   selectedIds?: Set<number>;
   selectedMarkerId?: string | null;
@@ -74,6 +156,8 @@ export default function FloorPlan2D({
   markers = [],
   entranceLabel = 'Main entrance',
   exitLabel = 'Exit / registration',
+  entranceSide = 'top',
+  exitSide = 'bottom',
   selectedId,
   selectedIds,
   selectedMarkerId,
@@ -147,18 +231,24 @@ export default function FloorPlan2D({
         <div className="pointer-events-none absolute inset-3 rounded-[1.6rem] border-[3px] border-ink-900/10" />
         <div className="pointer-events-none absolute inset-[14px] rounded-[1.35rem] border border-dashed border-ink-900/10" />
 
-        <div className="relative mb-5">
-          <div
-            className="mx-auto flex max-w-md items-center justify-center gap-2 rounded-[1.25rem] py-3 text-[11px] font-bold uppercase tracking-[0.2em] text-white shadow-lg"
-            style={{ background: 'linear-gradient(90deg, #047857, #10b981)' }}
-          >
-            <span className="h-2 w-2 animate-pulse rounded-full bg-white/90" />
-            {entranceLabel}
-          </div>
-          <div className="mx-auto mt-1 h-2 w-2/3 max-w-xs rounded-b-2xl bg-emerald-700/20" />
-        </div>
+        <GatesOnSide
+          side="top"
+          entranceSide={entranceSide}
+          exitSide={exitSide}
+          entranceLabel={entranceLabel}
+          exitLabel={exitLabel}
+        />
 
-        <div className="relative mx-auto" style={{ width: bayW + (showOuterAdd ? 64 : 0) }}>
+        <div className="relative flex items-stretch gap-3">
+          <GatesOnSide
+            side="left"
+            entranceSide={entranceSide}
+            exitSide={exitSide}
+            entranceLabel={entranceLabel}
+            exitLabel={exitLabel}
+          />
+
+        <div className="relative mx-auto min-w-0 flex-1" style={{ width: bayW + (showOuterAdd ? 64 : 0), maxWidth: '100%' }}>
           {layout.map((rowLen, row) => {
             const rowStalls = stallsInRow(row);
             const rowMarkers = markers.filter((m) => m.grid_row === row);
@@ -403,12 +493,22 @@ export default function FloorPlan2D({
           {overlay}
         </div>
 
-        <div className="relative mt-5">
-          <div className="mx-auto mt-1 h-2 w-2/3 max-w-xs rounded-t-2xl bg-ink-300/30" />
-          <div className="mx-auto flex max-w-md items-center justify-center rounded-[1.25rem] bg-ink-200/90 py-3 text-[11px] font-bold uppercase tracking-[0.2em] text-ink-600">
-            {exitLabel}
-          </div>
+          <GatesOnSide
+            side="right"
+            entranceSide={entranceSide}
+            exitSide={exitSide}
+            entranceLabel={entranceLabel}
+            exitLabel={exitLabel}
+          />
         </div>
+
+        <GatesOnSide
+          side="bottom"
+          entranceSide={entranceSide}
+          exitSide={exitSide}
+          entranceLabel={entranceLabel}
+          exitLabel={exitLabel}
+        />
       </div>
     </div>
   );
