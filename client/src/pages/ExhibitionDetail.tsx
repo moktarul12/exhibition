@@ -22,7 +22,7 @@ type Detail = Exhibition & {
 
 type SectionId = 'overview' | 'floor' | 'exhibitors' | 'media' | 'reviews' | 'schedule';
 
-const SECTION_IDS: SectionId[] = ['overview', 'floor', 'exhibitors', 'media', 'reviews', 'schedule'];
+const SECTION_IDS: SectionId[] = ['overview', 'floor', 'exhibitors', 'schedule', 'media', 'reviews'];
 
 function mapsOpenUrl(lat?: number, lng?: number, query?: string) {
   if (lat != null && lng != null) return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
@@ -134,9 +134,9 @@ export default function ExhibitionDetail() {
     { id: 'overview', label: 'Overview' },
     { id: 'floor', label: 'Floor plan' },
     { id: 'exhibitors', label: 'Exhibitors', count: data.exhibitors.length },
+    { id: 'schedule', label: 'Schedule', count: data.seminars.length },
     { id: 'media', label: 'Media', count: mediaCount },
     { id: 'reviews', label: 'Reviews', count: comments.length },
-    { id: 'schedule', label: 'Schedule', count: data.seminars.length },
   ];
 
   return (
@@ -416,13 +416,44 @@ export default function ExhibitionDetail() {
           </div>
         </section>
 
-        {/* 04 · Media — dark media wall */}
+        {/* 04 · Schedule — timeline */}
+        <section id="schedule" className="scroll-mt-32 border-t border-ink-100 bg-ink-50/60 py-12">
+          <div className="container-px">
+            <SectionTitle eyebrow="04 · Plan your day" title="Seminar schedule" subtitle="Talks and panels during the show." />
+            <div className="mt-8 max-w-3xl">
+              {data.seminars.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-ink-200 bg-white py-12 text-center text-ink-500">Schedule coming soon.</div>
+              ) : (
+                <div className="relative ml-2 space-y-6 border-l-2 border-brand-200 pl-7">
+                  {data.seminars.map((s) => (
+                    <div key={s.id} className="relative">
+                      <span className="absolute -left-[37px] top-4 h-4 w-4 rounded-full border-4 border-white bg-brand" />
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-ink-100 bg-white p-4 shadow-sm">
+                        <span className="rounded-full bg-brand-50 px-3 py-1 text-[11px] font-bold uppercase text-brand-700">{s.day}</span>
+                        <div className="min-w-[180px] flex-1">
+                          <div className="font-semibold text-ink-900">{s.title}</div>
+                          <div className="text-sm text-ink-500">by {s.speaker}</div>
+                        </div>
+                        <div className="text-right text-sm">
+                          <div className="flex items-center justify-end gap-1.5 font-medium text-ink-700"><Clock width={15} /> {s.time}</div>
+                          <div className="text-xs text-ink-400">{s.hall}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* 05 · Media — dark media wall */}
         <section id="media" className="scroll-mt-32 bg-ink-950 py-14">
           <div className="container-px space-y-12">
             {/* Reels */}
             <div>
               <div className="flex flex-wrap items-end justify-between gap-3">
-                <SectionTitle tone="dark" eyebrow="04 · Watch it live" title="Reels & shorts" subtitle="Quick clips from the venue." />
+                <SectionTitle tone="dark" eyebrow="05 · Watch it live" title="Reels & shorts" subtitle="Quick clips from the venue." />
                 {canManageMedia && <span className="pill border border-white/20 bg-white/10 text-white">Organizer / admin</span>}
               </div>
               {(data.reel_url || reels.length > 0) ? (
@@ -489,10 +520,10 @@ export default function ExhibitionDetail() {
           </div>
         </section>
 
-        {/* 05 · Reviews */}
+        {/* 06 · Reviews */}
         <section id="reviews" className="container-px scroll-mt-32 py-12">
           <SectionTitle
-            eyebrow="05 · Visitor voices"
+            eyebrow="06 · Visitor voices"
             title="Reviews & comments"
             subtitle={`${comments.length} review${comments.length === 1 ? '' : 's'}${avgRating ? ` · ${avgRating}/5 average` : ''}`}
           />
@@ -502,37 +533,6 @@ export default function ExhibitionDetail() {
             user={user}
             onPosted={(c) => setComments((prev) => [c, ...prev])}
           />
-        </section>
-
-        {/* 06 · Schedule — timeline */}
-        <section id="schedule" className="scroll-mt-32 border-t border-ink-100 bg-ink-50/60 py-12">
-          <div className="container-px">
-            <SectionTitle eyebrow="06 · Plan your day" title="Seminar schedule" subtitle="Talks and panels during the show." />
-            <div className="mt-8 max-w-3xl">
-              {data.seminars.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-ink-200 bg-white py-12 text-center text-ink-500">Schedule coming soon.</div>
-              ) : (
-                <div className="relative ml-2 space-y-6 border-l-2 border-brand-200 pl-7">
-                  {data.seminars.map((s) => (
-                    <div key={s.id} className="relative">
-                      <span className="absolute -left-[37px] top-4 h-4 w-4 rounded-full border-4 border-white bg-brand" />
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-ink-100 bg-white p-4 shadow-sm">
-                        <span className="rounded-full bg-brand-50 px-3 py-1 text-[11px] font-bold uppercase text-brand-700">{s.day}</span>
-                        <div className="min-w-[180px] flex-1">
-                          <div className="font-semibold text-ink-900">{s.title}</div>
-                          <div className="text-sm text-ink-500">by {s.speaker}</div>
-                        </div>
-                        <div className="text-right text-sm">
-                          <div className="flex items-center justify-end gap-1.5 font-medium text-ink-700"><Clock width={15} /> {s.time}</div>
-                          <div className="text-xs text-ink-400">{s.hall}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
         </section>
       </div>
 
