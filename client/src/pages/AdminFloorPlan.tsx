@@ -8,6 +8,7 @@ import { hallMarkers, hallRowLayout, layoutStallTotal, MARKER_META, SIZE_META, s
 import FloorViewToggle, { type FloorViewMode } from '../components/FloorViewToggle';
 import FloorPlan3D from '../components/FloorPlan3D';
 import FloorPlan2D from '../components/FloorPlan2D';
+import FloorPlanCompact from '../components/FloorPlanCompact';
 
 const PRESETS: { label: string; layout: number[] }[] = [
   { label: 'Custom (10 / 5 / 8 / 6)', layout: [10, 5, 8, 6] },
@@ -131,7 +132,7 @@ export default function AdminFloorPlan() {
   const [showHallSettings, setShowHallSettings] = useState(false);
   const [dragPreview, setDragPreview] = useState<{ row: number; col: number; spanCols: number; spanRows: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [viewMode, setViewMode] = useState<FloorViewMode>('2d');
+  const [viewMode, setViewMode] = useState<FloorViewMode>('compact');
   const [justPlacedId, setJustPlacedId] = useState<number | null>(null);
   const lastSelectedId = useRef<number | null>(null);
   const dragGroupRef = useRef<number[] | null>(null);
@@ -1576,7 +1577,7 @@ export default function AdminFloorPlan() {
                   </span>
                   <span className="pill border border-ink-200 bg-white text-ink-600">{currentMerge.label}</span>
                   {selected && <span className="pill border border-brand-200 bg-brand-soft text-brand-700 animate-pop">{selected.code}</span>}
-                  <FloorViewToggle value={viewMode} onChange={setViewMode} />
+                  <FloorViewToggle value={viewMode} onChange={setViewMode} modes={['compact', '2d', '3d']} />
                 </div>
                 <div className="flex items-center gap-3 text-[11px] font-medium text-ink-400">
                   <span>{stalls.length} stalls · {markers.items.length} amenities</span>
@@ -1588,7 +1589,7 @@ export default function AdminFloorPlan() {
                 </div>
               </div>
 
-              {inspectorMode === 'place' && viewMode === '2d' && (
+              {inspectorMode === 'place' && viewMode !== '3d' && (
                 <div className="shrink-0 border-b border-brand-100 bg-brand-soft/60 px-4 py-2 text-center text-xs font-semibold text-brand-800 animate-fade-in">
                   Place mode · click <span className="rounded bg-white px-1.5 py-0.5 font-bold text-brand-600">+</span> in a row bay, or the outer <b>Add</b> to extend a row
                   {draftMerge.label !== '1×1' && <> · painting <b>{draftMerge.label}</b></>}
@@ -1615,6 +1616,61 @@ export default function AdminFloorPlan() {
                       <button type="button" className="font-bold text-grape-700 underline" onClick={() => setViewMode('2d')}>2D</button>
                       {' '}to place, merge or drag
                     </p>
+                  </div>
+                ) : viewMode === 'compact' ? (
+                  <div className="animate-fade-in">
+                    <FloorPlanCompact
+                      layout={layout}
+                      stalls={stalls}
+                      markers={markers.items}
+                      entranceLabel={entranceLabel}
+                      exitLabel={exitLabel}
+                      entranceSide={entranceSide}
+                      exitSide={exitSide}
+                      editMode
+                      saving={saving}
+                      selectedId={selected?.id}
+                      selectedIds={selectedIds}
+                      selectedMarkerId={selectedMarkerId}
+                      hoverCell={hoverCell}
+                      onHoverCell={setHoverCell}
+                      previewCells={previewCells}
+                      footprintCells={selectionFootprint}
+                      justPlacedId={justPlacedId}
+                      pendingStallId={pendingNextStall?.id ?? null}
+                      absorbStallIds={footprintAbsorbIds}
+                      dragging={isDragging}
+                      dragStallIds={selectedIds}
+                      dragOverKey={dragOver}
+                      onEmptyClick={onCellAction}
+                      onAddToRow={addToRow}
+                      onStallClick={(stall, e) => selectStall(stall, e)}
+                      onMarkerClick={(m) => {
+                        setSelectedMarkerId(m.id);
+                        setSelected(null);
+                        setSelectedIds(new Set());
+                        setPlaceTool({ kind: 'marker', marker: m.kind });
+                        setMarkerPaint({ span_cols: m.span_cols || 1, span_rows: m.span_rows || 1 });
+                        const hit = MERGE_SIZES.find((x) => x.span_cols === (m.span_cols || 1) && x.span_rows === (m.span_rows || 1));
+                        setDraftMergeId(hit?.id || '1x1');
+                        setStallDirty(false);
+                        setPendingNextStall(null);
+                      }}
+                      onStallDragStart={(e, stall) => onDragStart(e, { type: 'stall', id: stall.id })}
+                      onStallDragEnd={onDragEnd}
+                      onMarkerDragStart={(e, m) => onDragStart(e, { type: 'marker', id: m.id })}
+                      onMarkerDragEnd={onDragEnd}
+                      onEmptyDragOver={(e, row, col) => onDragOverCell(e, row, col)}
+                      onEmptyDrop={(e, row, col) => onDropCell(e, row, col)}
+                      onEmptyDragLeave={(row, col) =>
+                        setDragOver((d) => (d === `${row}:${col}` ? null : d))
+                      }
+                    />
+                    {sizeDirty && (selected || selectedMarkerId) && (
+                      <p className="mt-2 text-center text-[11px] font-semibold text-amber-700">
+                        Size preview active — Apply in the inspector to save
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="animate-fade-in">

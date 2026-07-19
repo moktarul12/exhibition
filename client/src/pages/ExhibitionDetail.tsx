@@ -234,7 +234,7 @@ export default function ExhibitionDetail() {
       </div>
 
       {/* ---- Scroll-spy section nav ---- */}
-      <div ref={navRef} className="sticky top-16 z-30 mt-8 border-b border-ink-100 bg-[var(--paper)]/95 backdrop-blur">
+      <div ref={navRef} className="sticky top-16 z-30 mt-8 border-b border-ink-100 bg-white">
         <div className="container-px">
           <div className="no-scrollbar -mb-px flex gap-1 overflow-x-auto">
             {NAV.map((t) => (

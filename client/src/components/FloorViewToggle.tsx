@@ -1,14 +1,22 @@
-type Mode = '2d' | '3d';
+type Mode = '2d' | '3d' | 'compact';
 
 export type FloorViewMode = Mode;
+
+const LABELS: Record<Mode, string> = {
+  compact: 'Compact',
+  '2d': '2D',
+  '3d': '3D',
+};
 
 export default function FloorViewToggle({
   value,
   onChange,
+  modes = ['compact', '2d', '3d'],
   className = '',
 }: {
   value: Mode;
   onChange: (m: Mode) => void;
+  modes?: Mode[];
   className?: string;
 }) {
   return (
@@ -17,21 +25,18 @@ export default function FloorViewToggle({
       role="group"
       aria-label="Floor view"
     >
-      {([
-        { id: '2d' as const, label: '2D map' },
-        { id: '3d' as const, label: '3D hall' },
-      ]).map((opt) => (
+      {modes.map((id) => (
         <button
-          key={opt.id}
+          key={id}
           type="button"
-          onClick={() => onChange(opt.id)}
+          onClick={() => onChange(id)}
           className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
-            value === opt.id
+            value === id
               ? 'bg-white text-ink-900 shadow-sm'
               : 'text-ink-500 hover:text-ink-700'
           }`}
         >
-          {opt.label}
+          {LABELS[id]}
         </button>
       ))}
     </div>
